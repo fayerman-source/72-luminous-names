@@ -23,6 +23,10 @@ Based on the intersection of ancient Kabbalistic tradition and modern evolutiona
 - **🚀 Deploy-Ready:** Optimized for Vercel with seamless environment variable handling.
 
 
+## 🚀 Live Demo
+
+Experience the platform live: **[72-luminous-names.vercel.app](https://72-luminous-names.vercel.app)**
+
 ## 🛠️ Quick Start
 
 ### 1. Prerequisites
@@ -30,8 +34,8 @@ Ensure you have Python 3.10+ and `ffmpeg` (for audio generation) installed.
 
 ### 2. Installation
 ```bash
-git clone https://github.com/fayerman-source/72-names.git
-cd 72-names
+git clone https://github.com/fayerman-source/72-luminous-names.git
+cd 72-luminous-names
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
