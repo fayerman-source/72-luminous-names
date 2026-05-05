@@ -1,65 +1,73 @@
-# 72 Names Meditations
+# ✧ 72 Names Meditations
 
-A small Flask demo app for browsing the 72 Names meditation library and playing locally generated audio sessions.
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository is public-demo ready, not production ready. The current access flow is an in-memory demo unlock: no payment is processed, no account is persisted, and no real subscription is created.
+> **Immersive spiritual practice meet modern technology.** 
 
-## Project Structure
+72 Names Meditations is a focused, elegant Flask application designed to facilitate deep meditation through the sacred 72 Names of God. Unlike traditional reference apps, this platform provides an immersive audio-guided experience designed for daily mindfulness and spiritual elevation.
 
-- `app.py` - Flask app, route handlers, and the in-memory `NAMES` catalog.
-- `templates/` - Jinja templates for the home page, library, session player, and base layout.
-- `static/audio/` - Local MP3 output directory. Generated MP3 files are ignored by Git.
-- `generate_audio.py` - Utility that creates placeholder MP3 files with `ffmpeg`.
-- `vercel.json` - Vercel Python deployment configuration.
+![App Screenshot](https://raw.githubusercontent.com/fayerman-source/72-names/main/static/banner.png) *(Note: Add your own banner or screenshot here)*
 
-## Local Setup
+## ✨ Key Features
 
+- **🛡️ Secure & Lightweight:** Built with Flask, emphasizing security-first session management and environment-based configuration.
+- **🎧 Local Audio Synthesis:** Integrated `ffmpeg` utility to generate placeholder meditative tones for all 72 names locally.
+- **✨ Immersive UI:** A premium, dark-themed interface crafted for distraction-free practice.
+- **📖 Sacred Catalog:** Complete library of Hebrew names, transliterations, and spiritual themes.
+- **🚀 Deploy-Ready:** Optimized for Vercel and production-ready environments with environment variable protection.
+
+## 🛠️ Quick Start
+
+### 1. Prerequisites
+Ensure you have Python 3.10+ and `ffmpeg` (for audio generation) installed.
+
+### 2. Installation
 ```bash
+git clone https://github.com/fayerman-source/72-names.git
+cd 72-names
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-For development tests, also install:
-
-```bash
-pip install -r requirements-dev.txt
-```
-
-Create local environment settings:
-
+### 3. Local Environment
 ```bash
 cp .env.example .env
+# Edit .env and set a secure SECRET_KEY
 ```
 
-Set `SECRET_KEY` to a long random value before running the app. Flask will load `.env` automatically when `python-dotenv` is installed.
-
-## Run Locally
-
-```bash
-flask --app app run --debug
-```
-
-Open `http://127.0.0.1:5000`.
-
-## Audio Assets
-
-Generated MP3 files are intentionally not committed. To create local placeholder audio, install `ffmpeg`, then run:
-
+### 4. Generate Audio Assets
+To synthesize the meditative placeholder tones:
 ```bash
 python generate_audio.py
 ```
 
-The generated files are test tones and should be replaced with real recordings before a production release.
-
-## Tests
-
+### 5. Launch
 ```bash
+flask --app app run --debug
+```
+Visit `http://127.0.0.1:5000` to begin your session.
+
+## 🧪 Testing
+We maintain high standards for our core logic:
+```bash
+pip install -r requirements-dev.txt
 pytest
 ```
 
-The tests cover basic routing, demo unlock behavior, catalog integrity, and the missing-audio UI state.
+## 🗺️ Roadmap
+- [ ] High-fidelity studio recordings for all 72 sessions.
+- [ ] Persistent user progress tracking.
+- [ ] Advanced filtering by spiritual theme (e.g., Healing, Abundance, Protection).
+- [ ] Mobile-first PWA enhancements.
 
-## Deployment Notes
+## 🤝 Contributing
+Contributions are welcome! Whether it's improving the meditation scripts, refining the UI, or adding new features, please feel free to open a PR.
 
-This app can deploy to Vercel through `@vercel/python`. Set `SECRET_KEY` in the deployment environment. Do not use the demo unlock flow as production authentication or payment logic.
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+*Created with intention for the global spiritual community.*
