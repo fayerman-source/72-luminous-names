@@ -77,28 +77,55 @@ NAMES = [
 ]
 
 
+from gtts import gTTS
+import tempfile
+
 def generate_audio(name_data, output_dir):
     duration = name_data["duration"]
+    hebrew_name = name_data["name"]
     output_file = os.path.join(output_dir, f"{name_data['id']}.mp3")
+
+    # 1. Generate Speech using Google TTS (Hebrew)
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tts_file:
+        tts = gTTS(text=hebrew_name, lang='iw')
+        tts.save(tts_file.name)
+        tts_temp_path = tts_file.name
+
+    # 2. Combine Speech with Meditative Drone using ffmpeg
+    # We use 'amix' to layer the speech over the background
+    # The background is the same meditative drone as before
+    filter_complex = (
+        f"anoise=c=brown:d={duration}[bg];"
+        f"[bg]lowpass=f=200,volume=0.5[bg_low];"
+        f"sine=f=55:d={duration}:b=5,volume=0.2[sine];"
+        f"[bg_low][sine]amix=inputs=2[drone];"
+        f"[0:a]volume=2.0[speech];"
+        f"[drone][speech]amix=inputs=2:duration=first:weights=0.3 1.0[out]"
+    )
 
     cmd = [
         "ffmpeg",
         "-y",
+        "-i",
+        tts_temp_path,
         "-f",
         "lavfi",
         "-i",
-        f"sine=frequency=440:duration={duration}",
-        "-f",
-        "lavfi",
-        "-i",
-        f"anullsrc=r=44100:cl=mono:duration={duration}",
-        "-shortest",
+        "anullsrc=r=44100:cl=mono",
+        "-filter_complex",
+        filter_complex,
+        "-map",
+        "[out]",
+        "-t",
+        str(duration),
         "-b:a",
         "128k",
         output_file,
     ]
+    
     subprocess.run(cmd, capture_output=True)
-    print(f"Generated: {output_file}")
+    os.unlink(tts_temp_path)
+    print(f"Generated: {output_file} (Spoken: {hebrew_name})")
 
 
 if __name__ == "__main__":

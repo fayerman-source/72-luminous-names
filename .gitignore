@@ -21,3 +21,5 @@ htmlcov/
 
 static/audio/*.mp3
 !static/audio/.gitkeep
+.vercel
+.env*.local

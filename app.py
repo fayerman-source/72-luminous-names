@@ -1,10 +1,20 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
 
+from datetime import timedelta
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY")
 if not app.secret_key:
     raise RuntimeError("SECRET_KEY environment variable is required.")
+
+# Session configuration for better persistence
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
 
 
 def env_flag_enabled(name):
@@ -123,6 +133,7 @@ def subscribe():
         return redirect(url_for("index"))
 
     USERS[email] = {"subscribed": True}
+    session.permanent = True
     session["subscribed"] = True
     session["email"] = email
     flash("Demo access unlocked. No payment was processed.", "success")
