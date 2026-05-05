@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}72 Names Meditations{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e8e6e3; line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #2a2a35; }
+        .logo { font-size: 1.5rem; font-weight: 700; color: #d4af37; }
+        nav a { color: #a0a0a0; text-decoration: none; margin-left: 20px; transition: color 0.2s; }
+        nav a:hover { color: #d4af37; }
+        .hero { text-align: center; padding: 60px 20px; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 15px; color: #fff; }
+        .hero p { font-size: 1.2rem; color: #888; max-width: 600px; margin: 0 auto 30px; }
+        .btn { display: inline-block; padding: 14px 32px; background: #d4af37; color: #0a0a0f; text-decoration: none; border-radius: 6px; font-weight: 600; border: none; cursor: pointer; transition: transform 0.2s, background 0.2s; }
+        .btn:hover { background: #e5c04b; transform: translateY(-2px); }
+        .btn-secondary { background: #2a2a35; color: #e8e6e3; }
+        .btn-secondary:hover { background: #3a3a45; }
+        .flash { padding: 12px 20px; border-radius: 6px; margin-bottom: 20px; }
+        .flash.warning { background: #3d2f00; color: #f0d000; border: 1px solid #5a4500; }
+        .flash.success { background: #002d1a; color: #00d46a; border: 1px solid #004d2e; }
+        .flash.error { background: #2d0000; color: #ff4444; border: 1px solid #4d0000; }
+        .price-tag { font-size: 2rem; font-weight: 700; color: #d4af37; }
+        .price-period { font-size: 1rem; color: #666; }
+        footer { text-align: center; padding: 40px 20px; color: #555; border-top: 1px solid #1a1a22; margin-top: 60px; }
+        {% block styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">✧ 72 Names Meditations</div>
+            <nav>
+                <a href="/">Home</a>
+                {% if session.get('subscribed') %}
+                    <a href="/library">Library</a>
+                    <a href="/logout">Logout</a>
+                {% endif %}
+            </nav>
+        </header>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    <footer>
+        <p>72 Names Meditations — Deep spiritual practice through sacred names</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ name.transliteration }} - 72 Names Meditations{% endblock %}
+
+{% block styles %}
+.player { max-width: 600px; margin: 40px auto; text-align: center; }
+.name-display { font-size: 4rem; color: #d4af37; margin-bottom: 10px; }
+.transliteration { font-size: 1.8rem; color: #fff; margin-bottom: 5px; }
+.meaning { color: #888; margin-bottom: 30px; }
+.theme-badge { display: inline-block; background: #2a2a35; padding: 6px 16px; border-radius: 20px; font-size: 0.9rem; color: #aaa; margin-bottom: 30px; }
+.audio-player { background: #14141a; padding: 30px; border-radius: 16px; border: 1px solid #2a2a35; }
+audio { width: 100%; margin: 20px 0; }
+.duration { color: #666; font-size: 0.9rem; }
+{% endblock %}
+
+{% block content %}
+<div class="player">
+    <a href="/library" style="color: #666; text-decoration: none; font-size: 0.9rem;">← Back to Library</a>
+    
+    <div class="name-display">{{ name.name }}</div>
+    <div class="transliteration">{{ name.transliteration }}</div>
+    <div class="meaning">{{ name.meaning }}</div>
+    <div class="theme-badge">{{ name.theme }}</div>
+    
+    <div class="audio-player">
+        {% if audio_available %}
+            <p style="color: #666; margin-bottom: 20px;">Local demo audio</p>
+            <audio controls>
+                <source src="/static/audio/{{ name.id }}.mp3" type="audio/mpeg">
+                Your browser does not support audio.
+            </audio>
+        {% else %}
+            <p style="color: #888; margin-bottom: 20px;">Audio has not been generated locally. Run <code>python generate_audio.py</code> to create placeholder MP3 files.</p>
+        {% endif %}
+        <div class="duration">{{ name.duration }} minutes</div>
+    </div>
+</div>
+{% endblock %}
