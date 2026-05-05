@@ -1,4 +1,4 @@
-# ✧ Luminous Names: 72 Names Meditation
+# ✧ 72 Luminous Names: Meditation & Manifestation
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
@@ -6,13 +6,13 @@
 
 > **Manifesting Divine Light through the Sacred Word.**
 
-**Luminous Names** is a spiritual technology platform designed to facilitate deep meditation through the **72 Names of God**. Moving beyond the concept of "secret" occultism, this project focuses on the *manifestation* and *descent* of spiritual light into daily consciousness through the power of sound and frequency.
+**72 Luminous Names** is a spiritual technology platform designed to facilitate deep meditation through the **72 Names of God**. Moving beyond the concept of "secret" occultism, this project focuses on the *manifestation* and *descent* of spiritual light into daily consciousness through the power of sound and frequency.
 
-![App Banner](https://raw.githubusercontent.com/fayerman-source/luminous-names/main/static/banner.png)
+![App Banner](https://raw.githubusercontent.com/fayerman-source/72-luminous-names/main/static/banner.png)
 
 ## ✨ The Vision
 
-Based on the intersection of ancient Kabbalistic tradition and modern evolutionary spirituality, Luminous Names treats the 72 Names not as hidden mysteries, but as active **spiritual frequencies**. Each session is a vehicle for the "Solar" aspiration—the progressive self-revelation of light within the being.
+Based on the intersection of ancient Kabbalistic tradition and modern evolutionary spirituality, **72 Luminous Names** treats the names not as hidden mysteries, but as active **spiritual frequencies**. Each session is a vehicle for the "Solar" aspiration—the progressive self-revelation of light within the being.
 
 ## 🛠️ Key Features
 
