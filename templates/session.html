@@ -10,7 +10,6 @@
 .theme-badge { display: inline-block; background: #2a2a35; padding: 6px 16px; border-radius: 20px; font-size: 0.9rem; color: #aaa; margin-bottom: 30px; }
 .audio-player { background: #14141a; padding: 30px; border-radius: 16px; border: 1px solid #2a2a35; }
 audio { width: 100%; margin: 20px 0; }
-.duration { color: #666; font-size: 0.9rem; }
 {% endblock %}
 
 {% block content %}
@@ -24,15 +23,13 @@ audio { width: 100%; margin: 20px 0; }
     
     <div class="audio-player">
         {% if audio_available %}
-            <p style="color: #666; margin-bottom: 20px;">Local demo audio</p>
             <audio controls>
                 <source src="/static/audio/{{ name.id }}.mp3" type="audio/mpeg">
                 Your browser does not support audio.
             </audio>
         {% else %}
-            <p style="color: #888; margin-bottom: 20px;">Audio has not been generated locally. Run <code>python generate_audio.py</code> to create placeholder MP3 files.</p>
+            <p style="color: #888; margin-bottom: 20px;">The meditation session is being prepared.</p>
         {% endif %}
-        <div class="duration">{{ name.duration }} minutes</div>
     </div>
 </div>
 {% endblock %}
