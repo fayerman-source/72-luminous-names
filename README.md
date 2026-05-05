@@ -1,22 +1,27 @@
-# ✧ 72 Names Meditations
+# ✧ Luminous Names: 72 Names Meditation
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Immersive spiritual practice meet modern technology.** 
+> **Manifesting Divine Light through the Sacred Word.**
 
-72 Names Meditations is a focused, elegant Flask application designed to facilitate deep meditation through the sacred 72 Names of God. Unlike traditional reference apps, this platform provides an immersive audio-guided experience designed for daily mindfulness and spiritual elevation.
+**Luminous Names** is a spiritual technology platform designed to facilitate deep meditation through the **72 Names of God**. Moving beyond the concept of "secret" occultism, this project focuses on the *manifestation* and *descent* of spiritual light into daily consciousness through the power of sound and frequency.
 
-![App Screenshot](https://raw.githubusercontent.com/fayerman-source/72-names/main/static/banner.png) *(Note: Add your own banner or screenshot here)*
+![App Banner](https://raw.githubusercontent.com/fayerman-source/luminous-names/main/static/banner.png)
 
-## ✨ Key Features
+## ✨ The Vision
 
-- **🛡️ Secure & Lightweight:** Built with Flask, emphasizing security-first session management and environment-based configuration.
-- **🎧 Local Audio Synthesis:** Integrated `ffmpeg` utility to generate placeholder meditative tones for all 72 names locally.
-- **✨ Immersive UI:** A premium, dark-themed interface crafted for distraction-free practice.
-- **📖 Sacred Catalog:** Complete library of Hebrew names, transliterations, and spiritual themes.
-- **🚀 Deploy-Ready:** Optimized for Vercel and production-ready environments with environment variable protection.
+Based on the intersection of ancient Kabbalistic tradition and modern evolutionary spirituality, Luminous Names treats the 72 Names not as hidden mysteries, but as active **spiritual frequencies**. Each session is a vehicle for the "Solar" aspiration—the progressive self-revelation of light within the being.
+
+## 🛠️ Key Features
+
+- **☀️ Supramental Focus:** Designed for the manifestation of light, moving from the obscure to the openly radiant.
+- **🛡️ Secure & Lightweight:** Built with Flask, utilizing environment-based configuration for production-grade security.
+- **🎧 Local Audio Synthesis:** Integrated `ffmpeg` engine to generate meditative frequencies for all 72 names locally.
+- **📖 Enhanced Catalog:** Includes traditional spiritual intentions (e.g., Healing, Miracle Making, Protection) for each name.
+- **🚀 Deploy-Ready:** Optimized for Vercel with seamless environment variable handling.
+
 
 ## 🛠️ Quick Start
 
