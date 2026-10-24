@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+from pathlib import Path
 
 def get_audio_info(file_path):
     cmd = [
@@ -28,7 +29,7 @@ def get_volume_info(file_path):
     return info
 
 def run_qc():
-    audio_dir = "static/audio"
+    audio_dir = Path(__file__).resolve().parents[1] / "static" / "audio"
     report = []
     
     print(f"{'ID':<4} | {'Duration':<10} | {'Max Vol':<12} | {'Mean Vol':<12} | {'Size':<10} | {'Status'}")
