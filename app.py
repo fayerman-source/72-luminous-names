@@ -95,8 +95,6 @@ NAMES = [
     {"id": 72, "name": "מום", "transliteration": "Mem Vav Mem", "meaning": "Spiritual Cleansing", "theme": "Cleansing"},
 ]
 
-USERS = {}
-
 
 @app.route("/")
 def index():
@@ -132,23 +130,11 @@ def subscribe():
         flash("Enter a valid email to unlock the demo library", "error")
         return redirect(url_for("index"))
 
-    USERS[email] = {"subscribed": True}
     session.permanent = True
     session["subscribed"] = True
     session["email"] = email
     flash("Demo access unlocked. No payment was processed.", "success")
     return redirect(url_for("library"))
-
-
-@app.route("/login", methods=["POST"])
-def login():
-    email = request.form.get("email")
-    if email in USERS and USERS[email].get("subscribed"):
-        session["subscribed"] = True
-        session["email"] = email
-    else:
-        flash("Email not found or not subscribed", "error")
-    return redirect(url_for("index"))
 
 
 @app.route("/logout")
