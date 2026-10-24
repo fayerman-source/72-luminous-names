@@ -1,10 +1,15 @@
 .env
+.env*.local
+
 .venv/
 venv/
 env/
+
 .agents/
 .codex/
 .gemini_security/
+.aider*
+.vercel/
 
 __pycache__/
 *.py[cod]
@@ -16,10 +21,11 @@ __pycache__/
 .coverage
 htmlcov/
 
-.vercel/
 *.log
 
-static/audio/*.mp3
-!static/audio/.gitkeep
-.vercel
-.env*.local
+# Raw audio dumps written by scripts/probe_* (regenerable, never committed)
+*.raw
+*.bin
+
+# static/audio/*.mp3 is deliberately NOT ignored: the deployed demo serves all
+# 72 MP3s (~51 MB) straight from the repo. See README "Deployment assets".
