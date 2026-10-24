@@ -57,7 +57,7 @@ def test_session_shows_missing_audio_message(monkeypatch, tmp_path):
     response = client.get("/session/1")
 
     assert response.status_code == 200
-    assert b"Audio has not been generated locally" in response.data
+    assert b"The meditation session is being prepared." in response.data
 
 
 def test_session_shows_audio_player_when_mp3_exists(monkeypatch, tmp_path):
@@ -73,8 +73,8 @@ def test_session_shows_audio_player_when_mp3_exists(monkeypatch, tmp_path):
     response = client.get("/session/1")
 
     assert response.status_code == 200
-    assert b"Local demo audio" in response.data
     assert b"/static/audio/1.mp3" in response.data
+    assert b"The meditation session is being prepared." not in response.data
 
 
 def test_names_catalog_has_expected_ids():
