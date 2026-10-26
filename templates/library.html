@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Library - 72 Names Meditations{% endblock %}
+{% block title %}All 72 Names - 72 Names Meditations{% endblock %}
+
+{% block description %}Browse all 72 Hebrew names of God, each with its traditional intention and a chanted recording. Free to listen.{% endblock %}
 
 {% block content %}
-<h1 style="margin-bottom: 30px;">Meditation Library</h1>
+<h1 style="margin-bottom: 10px;">All 72 Names</h1>
+<p style="color: #888; margin-bottom: 30px;">Pick a name and press play. Each is chanted with the intention it traditionally carries.</p>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
     {% for name in names %}
-    <a href="/session/{{ name.id }}" style="display: block; background: #14141a; padding: 20px; border-radius: 10px; text-decoration: none; border: 1px solid #2a2a35; transition: border-color 0.2s;">
+    <a href="/session/{{ name.id }}" style="display: block; background: #14141a; padding: 20px; border-radius: 10px; text-decoration: none; border: 1px solid #2a2a35;">
         <div style="font-size: 2rem; color: #d4af37; margin-bottom: 8px;">{{ name.name }}</div>
         <div style="color: #fff; font-weight: 600;">{{ name.transliteration }}</div>
         <div style="color: #666; font-size: 0.85rem;">{{ name.theme }}</div>
@@ -15,5 +18,5 @@
     {% endfor %}
 </div>
 
-<p style="margin-top: 30px; color: #555;">72 sessions available</p>
+<p style="margin-top: 30px; color: #555;">72 chants, free to listen — no account needed.</p>
 {% endblock %}

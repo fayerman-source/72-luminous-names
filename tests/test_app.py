@@ -6,58 +6,32 @@ import sys
 from app import NAMES, app
 
 
-def test_home_page_loads_with_demo_copy():
+def test_home_page_links_into_the_catalog():
     client = app.test_client()
 
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b"Demo Access" in response.data
-    assert b"No payment is processed" in response.data
+    assert b"Browse all 72 names" in response.data
+    assert b'href="/session/1"' in response.data
 
 
-def test_library_requires_demo_unlock():
+def test_library_is_public_and_lists_every_name():
     client = app.test_client()
 
     response = client.get("/library")
 
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/")
-
-
-def test_demo_unlock_grants_library_access():
-    client = app.test_client()
-
-    response = client.post("/subscribe", data={"email": "Demo@Example.com"})
-
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/library")
-
-    library = client.get("/library")
-    assert library.status_code == 200
-    assert b"72 sessions available" in library.data
-
-
-def test_invalid_demo_unlock_rejects_missing_email():
-    client = app.test_client()
-
-    response = client.post("/subscribe", data={"email": ""}, follow_redirects=True)
-
     assert response.status_code == 200
-    assert b"Enter a valid email" in response.data
+    assert response.data.count(b'href="/session/') == 72
 
 
-def test_session_shows_missing_audio_message(monkeypatch, tmp_path):
+def test_session_page_is_public():
     client = app.test_client()
-    monkeypatch.setattr(app, "static_folder", str(tmp_path))
-
-    with client.session_transaction() as flask_session:
-        flask_session["subscribed"] = True
 
     response = client.get("/session/1")
 
     assert response.status_code == 200
-    assert b"The meditation session is being prepared." in response.data
+    assert b"Vav Hey Vav" in response.data
 
 
 def test_session_shows_audio_player_when_mp3_exists(monkeypatch, tmp_path):
@@ -67,14 +41,78 @@ def test_session_shows_audio_player_when_mp3_exists(monkeypatch, tmp_path):
     Path(audio_dir / "1.mp3").write_bytes(b"placeholder")
     monkeypatch.setattr(app, "static_folder", str(tmp_path))
 
-    with client.session_transaction() as flask_session:
-        flask_session["subscribed"] = True
-
     response = client.get("/session/1")
 
     assert response.status_code == 200
     assert b"/static/audio/1.mp3" in response.data
-    assert b"The meditation session is being prepared." not in response.data
+    assert b"being prepared" not in response.data
+
+
+def test_session_shows_fallback_when_audio_is_missing(monkeypatch, tmp_path):
+    client = app.test_client()
+    monkeypatch.setattr(app, "static_folder", str(tmp_path))
+
+    response = client.get("/session/1")
+
+    assert response.status_code == 200
+    assert b"being prepared" in response.data
+
+
+def test_unknown_name_returns_404():
+    client = app.test_client()
+
+    response = client.get("/session/999")
+
+    assert response.status_code == 404
+
+
+def test_session_page_carries_social_preview_metadata():
+    client = app.test_client()
+
+    html = client.get("/session/12").data
+
+    assert b'property="og:type" content="music.song"' in html
+    assert b'property="og:title"' in html
+    assert b'property="og:image"' in html
+    assert b'property="og:audio"' in html
+    assert b'rel="canonical"' in html
+    assert b"Unconditional Love" in html
+
+
+def test_session_pages_link_to_neighbouring_names():
+    client = app.test_client()
+
+    html = client.get("/session/1").data
+
+    assert b'href="/session/72"' in html
+    assert b'href="/session/2"' in html
+
+
+def test_sitemap_lists_every_page():
+    client = app.test_client()
+
+    response = client.get("/sitemap.xml")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/xml"
+    assert response.data.count(b"<loc>") == 74  # home, library, 72 names
+
+
+def test_robots_points_at_the_sitemap():
+    client = app.test_client()
+
+    response = client.get("/robots.txt")
+
+    assert response.status_code == 200
+    assert b"/sitemap.xml" in response.data
+
+
+def test_every_name_has_an_audio_file():
+    audio_dir = Path(app.static_folder) / "audio"
+
+    missing = [name["id"] for name in NAMES if not (audio_dir / f"{name['id']}.mp3").exists()]
+
+    assert missing == []
 
 
 def test_names_catalog_has_expected_ids():
