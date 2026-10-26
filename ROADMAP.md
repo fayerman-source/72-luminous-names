@@ -17,7 +17,8 @@
 
 ## Production Readiness
 
-- Require a strong `SECRET_KEY` in production.
-- Replace in-memory demo state with durable storage.
+- Require `SECRET_KEY` only if cookie-backed features (accounts, saved names) are ever added — never a hardcoded default.
+- Enable Vercel Web Analytics so traffic can actually be measured.
+- Replace in-memory demo state with durable storage, if accounts return.
 - Add structured logging and error monitoring.
 - Document asset licensing and contributor permissions for recordings.

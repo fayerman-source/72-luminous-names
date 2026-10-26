@@ -2,26 +2,17 @@ from flask import Flask, Response, abort, render_template, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 
-from datetime import timedelta
-
 app = Flask(__name__)
 
 # Vercel terminates TLS in front of us; without this, canonical links, OG image
 # URLs and the sitemap would all be generated as http://.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-app.secret_key = os.environ.get("SECRET_KEY")
-if not app.secret_key:
-    raise RuntimeError("SECRET_KEY environment variable is required.")
-
-# Session settings are kept for future session-backed features (progress,
-# preferences). Nothing on the site requires a signed cookie today.
-app.config.update(
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
-)
+# The app is stateless: no accounts, no cookies, nothing to sign. That is why
+# there is no SECRET_KEY here — an absent secret used to be a hard failure, but
+# without sessions the "forgeable cookie" risk it guarded against cannot exist.
+# If a cookie-backed feature is added later, require SECRET_KEY at that point
+# and never fall back to a hardcoded default.
 
 
 def env_flag_enabled(name):
