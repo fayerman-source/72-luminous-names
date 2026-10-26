@@ -42,10 +42,7 @@ pip install -r requirements.txt
 ```
 
 ### 3. Local Environment
-```bash
-cp .env.example .env
-# Edit .env and set a secure SECRET_KEY
-```
+No configuration required — the app is stateless and boots with no `.env`.
 
 ### 4. Generate Audio Assets
 To synthesize the meditative placeholder tones:
