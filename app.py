@@ -1,14 +1,21 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, Response, abort, render_template, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 
 from datetime import timedelta
 
 app = Flask(__name__)
+
+# Vercel terminates TLS in front of us; without this, canonical links, OG image
+# URLs and the sitemap would all be generated as http://.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 app.secret_key = os.environ.get("SECRET_KEY")
 if not app.secret_key:
     raise RuntimeError("SECRET_KEY environment variable is required.")
 
-# Session configuration for better persistence
+# Session settings are kept for future session-backed features (progress,
+# preferences). Nothing on the site requires a signed cookie today.
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
@@ -98,49 +105,57 @@ NAMES = [
 
 @app.route("/")
 def index():
-    return render_template("index.html", names=NAMES[:3])
+    return render_template("index.html", names=NAMES[:6])
 
 
 @app.route("/library")
 def library():
-    if not session.get("subscribed"):
-        flash("Unlock demo access to view the full library", "warning")
-        return redirect(url_for("index"))
     return render_template("library.html", names=NAMES)
 
 
 @app.route("/session/<int:name_id>")
 def session_view(name_id):
-    if not session.get("subscribed"):
-        flash("Unlock demo access to view sessions", "warning")
-        return redirect(url_for("index"))
     name = next((n for n in NAMES if n["id"] == name_id), None)
     if not name:
-        return redirect(url_for("library"))
+        abort(404)
 
     audio_path = os.path.join(app.static_folder, "audio", f"{name_id}.mp3")
     audio_available = os.path.exists(audio_path)
-    return render_template("session.html", name=name, audio_available=audio_available)
+    return render_template(
+        "session.html",
+        name=name,
+        audio_available=audio_available,
+        previous=NAMES[(name_id - 2) % len(NAMES)],
+        following=NAMES[name_id % len(NAMES)],
+    )
 
 
-@app.route("/subscribe", methods=["POST"])
-def subscribe():
-    email = request.form.get("email", "").strip().lower()
-    if not email or "@" not in email:
-        flash("Enter a valid email to unlock the demo library", "error")
-        return redirect(url_for("index"))
+@app.route("/sitemap.xml")
+def sitemap():
+    paths = [url_for("index"), url_for("library")]
+    paths += [url_for("session_view", name_id=n["id"]) for n in NAMES]
 
-    session.permanent = True
-    session["subscribed"] = True
-    session["email"] = email
-    flash("Demo access unlocked. No payment was processed.", "success")
-    return redirect(url_for("library"))
+    root = url_for("index", _external=True).rstrip("/")
+    body = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    body += [f"  <url><loc>{root}{path}</loc></url>" for path in paths]
+    body.append("</urlset>")
+    return Response("\n".join(body) + "\n", mimetype="application/xml")
 
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("index"))
+@app.route("/robots.txt")
+def robots():
+    return Response(
+        f"User-agent: *\nAllow: /\n\nSitemap: {url_for('sitemap', _external=True)}\n",
+        mimetype="text/plain",
+    )
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return render_template("404.html"), 404
 
 
 if __name__ == "__main__":

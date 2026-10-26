@@ -1,42 +1,33 @@
 {% extends "base.html" %}
 
+{% block description %}A chant for each of the 72 Hebrew names of God, paired with its traditional intention. Free to listen, no signup.{% endblock %}
+
 {% block content %}
 <section class="hero">
-    <h1>Immersive Audio Meditations<br>for the 72 Names of God</h1>
-    <p>Move beyond memorization. Explore a demo meditation library for each sacred name.</p>
-    
+    <h1>Immersive Chants<br>for the 72 Names of God</h1>
+    <p>Every name is chanted aloud and paired with the intention it traditionally carries. No signup, no payment — press play.</p>
+
     <div style="margin: 40px 0;">
-        {% if not session.get('subscribed') %}
-            <div class="price-tag">Demo Access</div>
-            <p style="color: #666; margin-top: 8px; margin-bottom: 30px;">Unlock the library locally. No payment is processed.</p>
-            
-            <form action="/subscribe" method="POST" style="display: inline-block; margin-right: 15px;">
-                <input type="email" name="email" placeholder="Your email" required style="padding: 14px; border-radius: 6px; border: 1px solid #333; background: #1a1a22; color: #fff; width: 220px; margin-right: 10px;">
-                <button type="submit" class="btn">Unlock Demo</button>
-            </form>
-        {% else %}
-            <div class="price-tag">Access Active</div>
-            <p style="color: #666; margin-top: 8px; margin-bottom: 30px;">Welcome back! Your demo session is active.</p>
-            <a href="/library" class="btn">Enter Library</a>
-        {% endif %}
+        <a href="/library" class="btn">Browse all 72 names</a>
     </div>
 </section>
 
 <section style="margin-top: 60px;">
-    <h2 style="text-align: center; margin-bottom: 40px;">Sample Sessions</h2>
+    <h2 style="text-align: center; margin-bottom: 40px;">Start with one</h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
         {% for name in names %}
-        <div style="background: #14141a; padding: 25px; border-radius: 12px; border: 1px solid #2a2a35;">
+        <a href="/session/{{ name.id }}" style="display: block; background: #14141a; padding: 25px; border-radius: 12px; border: 1px solid #2a2a35; text-decoration: none;">
             <div style="font-size: 2.5rem; color: #d4af37; margin-bottom: 10px;">{{ name.name }}</div>
-            <h3 style="margin-bottom: 5px;">{{ name.transliteration }}</h3>
-            <p style="color: #888; font-size: 0.9rem; margin-bottom: 10px;">{{ name.meaning }} — {{ name.theme }}</p>
-        </div>
+            <h3 style="margin-bottom: 5px; color: #fff;">{{ name.transliteration }}</h3>
+            <p style="color: #888; font-size: 0.9rem; margin-bottom: 12px;">{{ name.meaning }} — {{ name.theme }}</p>
+            <span style="color: #d4af37; font-size: 0.85rem;">▶ Listen</span>
+        </a>
         {% endfor %}
     </div>
 </section>
 
 <section style="margin-top: 60px; padding: 40px; background: #14141a; border-radius: 12px; text-align: center;">
     <h2 style="margin-bottom: 15px;">Why 72 Names Meditations?</h2>
-    <p style="color: #888; max-width: 600px; margin: 0 auto;">Each of the 72 names is traditionally paired with an intention — healing, protection, clarity, gratitude. A session gives you one name to chant alongside the theme it carries, so you can work with a single intention instead of memorizing a list. Sessions run from under a minute to several minutes.</p>
+    <p style="color: #888; max-width: 600px; margin: 0 auto;">Each of the 72 names is traditionally paired with an intention — healing, protection, clarity, gratitude. Find the one you need, listen to it chanted, and stay with that single intention instead of working through a memorized list.</p>
 </section>
 {% endblock %}
