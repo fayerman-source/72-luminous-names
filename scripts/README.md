@@ -12,6 +12,16 @@ python scripts/qc_audio.py
 Probes all 72 files in `static/audio/` for presence, duration, peak/mean volume, and
 size. Flags missing, short (<5s), tiny (<50KB), and silent files.
 
+## Static Site Export
+
+```bash
+python scripts/build_static.py --output dist
+```
+
+Renders `/sitemap.xml`, `/robots.txt`, `/404.html`, and every route listed in
+`/sitemap.xml` (`/` -> `dist/index.html`, `/library` -> `dist/library/index.html`,
+`/session/1..72` -> `dist/session/<id>/index.html`) alongside `static/` assets.
+
 ## Voice-search probes
 
 The `probe_*.py` files are one-off experiments used to choose the voice for the
