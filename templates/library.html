@@ -4,19 +4,77 @@
 
 {% block description %}Browse all 72 Hebrew names of God, each with its traditional intention and a chanted recording. Free to listen.{% endblock %}
 
+{% block styles %}
+.finder-bar { background: #14141a; border: 1px solid #2a2a35; border-radius: 12px; padding: 18px; margin-bottom: 24px; }
+.finder-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.finder-input { flex: 1; min-width: 220px; padding: 11px 14px; border-radius: 8px; border: 1px solid #2a2a35; background: #0a0a0f; color: #e8e6e3; font-size: 0.95rem; }
+.group-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.group-pill { display: inline-block; padding: 6px 13px; border-radius: 999px; background: #1d1d26; border: 1px solid #2a2a35; color: #b8b5ad; text-decoration: none; font-size: 0.84rem; transition: border-color 0.2s, color 0.2s; }
+.group-pill:hover, .group-pill.is-active { border-color: #d4af37; color: #d4af37; }
+.finder-status { color: #888; font-size: 0.9rem; margin-bottom: 18px; }
+.names-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 15px; }
+.name-card { display: block; background: #14141a; padding: 20px; border-radius: 10px; text-decoration: none; border: 1px solid #2a2a35; transition: border-color 0.2s; }
+.name-card:hover { border-color: #d4af37; }
+.name-card[hidden] { display: none; }
+{% endblock %}
+
 {% block content %}
 <h1 style="margin-bottom: 10px;">All 72 Names</h1>
-<p style="color: #888; margin-bottom: 30px;">Pick a name and press play. Each is chanted with the intention it traditionally carries.</p>
+<p style="color: #888; margin-bottom: 22px;">Find a name by what you need right now, or browse all 72 intentions and press play.</p>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+<div class="finder-bar">
+    <form id="intention-finder-form" class="finder-form" action="/library" method="get">
+        {% if active_group %}
+        <input type="hidden" id="finder-group-input" name="group" value="{{ active_group }}">
+        {% endif %}
+        <input id="intention-search" class="finder-input" type="search" name="q" value="{{ query }}" aria-label="Search names by intention, letters, or number" placeholder="Search intention, Hebrew letters, transliteration, or # (e.g. healing, anger, love, 5)...">
+        <button type="submit" class="btn" style="padding: 10px 22px;">Search</button>
+        {% if query or active_group %}
+        <a href="/library" class="btn btn-secondary" style="padding: 10px 18px;">Reset</a>
+        {% endif %}
+    </form>
+    <div class="group-pills" role="navigation" aria-label="Filter by situation">
+        <a href="/library" data-group="" class="group-pill {% if not active_group %}is-active{% endif %}">All 72</a>
+        {% for grp in situation_groups %}
+        <a href="/library?group={{ grp.slug }}" data-group="{{ grp.slug }}" class="group-pill {% if active_group == grp.slug %}is-active{% endif %}">{{ grp.label }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<p id="finder-status" class="finder-status" aria-live="polite">
+    Showing {{ names|length }} of {{ total_count }} names{% if query %} matching "{{ query }}"{% endif %}
+</p>
+
+{% if names %}
+<div id="names-grid" class="names-grid">
     {% for name in names %}
-    <a href="/session/{{ name.id }}" style="display: block; background: #14141a; padding: 20px; border-radius: 10px; text-decoration: none; border: 1px solid #2a2a35;">
-        <div style="font-size: 2rem; color: #d4af37; margin-bottom: 8px;">{{ name.name }}</div>
-        <div style="color: #fff; font-weight: 600;">{{ name.transliteration }}</div>
-        <div style="color: #666; font-size: 0.85rem;">{{ name.theme }}</div>
+    {% set grp = group_by_id.get(name.id) %}
+    <a href="/session/{{ name.id }}"
+       class="name-card"
+       data-id="{{ name.id }}"
+       data-group="{{ grp.slug if grp else '' }}"
+       data-search="{{ name.id }} {{ name.name }} {{ name.transliteration }} {{ name.meaning }} {{ name.theme }} {{ grp.label if grp else '' }}">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+            <div style="font-size: 2rem; color: #d4af37;">{{ name.name }}</div>
+            <span style="color: #555; font-size: 0.8rem;">#{{ name.id }}</span>
+        </div>
+        <div style="color: #fff; font-weight: 600; margin-bottom: 4px;">{{ name.transliteration }}</div>
+        <div style="color: #aaa; font-size: 0.88rem; margin-bottom: 6px;">{{ name.meaning }}</div>
+        <div style="color: #666; font-size: 0.8rem;">{{ grp.label if grp else name.theme }}</div>
     </a>
     {% endfor %}
 </div>
+{% else %}
+<div id="finder-empty" style="background: #14141a; border: 1px solid #2a2a35; border-radius: 10px; padding: 30px; text-align: center;">
+    <p style="color: #aaa; margin-bottom: 16px;">No names matched that search. Try a broader word like "healing", "peace", "love", or "vision".</p>
+    <a href="/library" class="btn btn-secondary">Show all 72 names</a>
+</div>
+{% endif %}
+
+<p id="finder-client-empty" hidden style="background: #14141a; border: 1px solid #2a2a35; border-radius: 10px; padding: 30px; text-align: center; color: #aaa;">
+    No names matched that filter. Clear the search box or choose "All 72".
+</p>
 
 <p style="margin-top: 30px; color: #555;">72 chants, free to listen — no account needed.</p>
+<script src="/static/finder.js" defer></script>
 {% endblock %}

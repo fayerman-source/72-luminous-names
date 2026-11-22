@@ -3,7 +3,7 @@ import os
 import subprocess
 import sys
 
-from app import NAMES, app
+from app import GROUP_BY_NAME_ID, NAMES, SITUATION_GROUPS, app
 
 
 def test_home_page_links_into_the_catalog():
@@ -139,3 +139,44 @@ def test_app_runs_with_no_configuration_at_all():
 
     assert result.returncode == 0, result.stderr
     assert "booted" in result.stdout
+
+
+def test_every_name_belongs_to_exactly_one_situation_group():
+    seen = []
+    for grp in SITUATION_GROUPS:
+        seen.extend(grp["ids"])
+
+    assert sorted(seen) == list(range(1, 73))
+    assert set(GROUP_BY_NAME_ID.keys()) == set(range(1, 73))
+
+
+def test_library_filters_by_query_and_situation_group():
+    client = app.test_client()
+
+    anger_resp = client.get("/library?q=anger")
+    anger_html = anger_resp.data.decode("utf-8")
+    assert anger_resp.status_code == 200
+    assert 'href="/session/56"' in anger_html
+    assert "Dispelling Anger" in anger_html
+    assert 'href="/session/1"' not in anger_html
+
+    healing_resp = client.get("/library?group=healing")
+    healing_html = healing_resp.data.decode("utf-8")
+    assert healing_resp.status_code == 200
+    assert healing_resp.data.count(b'href="/session/') == 12
+    assert 'href="/session/5"' in healing_html
+    assert "Showing 12 of 72 names" in healing_html
+
+    empty_resp = client.get("/library?q=zzzznonexistentintention")
+    assert empty_resp.status_code == 200
+    assert b"No names matched that search" in empty_resp.data
+
+
+def test_home_page_exposes_intention_search_and_situation_links():
+    client = app.test_client()
+
+    html = client.get("/").data.decode("utf-8")
+
+    assert 'action="/library"' in html
+    assert 'href="/library?group=healing"' in html
+    assert 'href="/library?group=peace"' in html
