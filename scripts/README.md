@@ -9,8 +9,11 @@ run from the repo root collects only `tests/` (see `pytest.ini`).
 python scripts/qc_audio.py
 ```
 
-Probes all 72 files in `static/audio/` for presence, duration, peak/mean volume, and
-size. Flags missing, short (<5s), tiny (<50KB), and silent files.
+Probes all 72 files in `static/audio/` for presence, readability, duration (`5s–45s`),
+peak/mean volume, internal/trailing silences (`>=4s` below `-45 dB`), and catalog-wide
+loudness swings (`±4.5 dB` around the median and `<=6.0 dB` total spread). Exits with
+code `1` when any track or catalog loudness check fails. See `scripts/AUDIO_QC_REPORT.md`
+for the current audit of shipped files.
 
 ## Voice-search probes
 
