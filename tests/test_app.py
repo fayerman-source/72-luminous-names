@@ -2,8 +2,9 @@ from pathlib import Path
 import os
 import subprocess
 import sys
+import pytest
 
-from app import NAMES, app
+from app import NAMES, app, get_public_base_url
 
 
 def test_home_page_links_into_the_catalog():
@@ -139,3 +140,67 @@ def test_app_runs_with_no_configuration_at_all():
 
     assert result.returncode == 0, result.stderr
     assert "booted" in result.stdout
+
+
+def test_untrusted_host_header_returns_400():
+    client = app.test_client()
+
+    assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
+    assert client.get("/session/999", headers={"Host": "evil.example"}).status_code == 400
+
+
+def test_spoofed_forwarded_headers_and_query_do_not_affect_canonical_or_sitemap():
+    client = app.test_client()
+    spoofed = {
+        "X-Forwarded-Host": "evil.example",
+        "X-Forwarded-Proto": "javascript",
+    }
+
+    session_resp = client.get("/session/1?utm_source=tracker&foo=bar", headers=spoofed)
+    html = session_resp.data.decode("utf-8")
+    assert session_resp.status_code == 200
+    assert 'href="https://72-luminous-names.vercel.app/session/1"' in html
+    assert 'property="og:url" content="https://72-luminous-names.vercel.app/session/1"' in html
+    assert "evil.example" not in html
+    assert "javascript:" not in html
+    assert "utm_source" not in html
+
+    sitemap_resp = client.get("/sitemap.xml", headers=spoofed)
+    xml = sitemap_resp.data.decode("utf-8")
+    assert sitemap_resp.status_code == 200
+    assert "<loc>https://72-luminous-names.vercel.app/session/1</loc>" in xml
+    assert "evil.example" not in xml
+
+
+def test_public_base_url_env_controls_external_metadata(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://names.example.org")
+    client = app.test_client()
+
+    html = client.get("/session/12").data.decode("utf-8")
+    sitemap_xml = client.get("/sitemap.xml").data.decode("utf-8")
+    robots_txt = client.get("/robots.txt").data.decode("utf-8")
+
+    assert 'rel="canonical" href="https://names.example.org/session/12"' in html
+    assert 'property="og:image" content="https://names.example.org/static/banner.png"' in html
+    assert 'property="og:audio" content="https://names.example.org/static/audio/12.mp3"' in html
+    assert "<loc>https://names.example.org/library</loc>" in sitemap_xml
+    assert "Sitemap: https://names.example.org/sitemap.xml" in robots_txt
+
+
+def test_404_omits_canonical_and_missing_audio_omits_og_audio(monkeypatch, tmp_path):
+    client = app.test_client()
+
+    not_found_html = client.get("/session/999").data.decode("utf-8")
+    assert 'rel="canonical"' not in not_found_html
+    assert 'property="og:url"' not in not_found_html
+
+    monkeypatch.setattr(app, "static_folder", str(tmp_path))
+    missing_audio_html = client.get("/session/1").data.decode("utf-8")
+    assert 'property="og:audio"' not in missing_audio_html
+
+
+def test_invalid_public_base_url_is_rejected(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "javascript://alert(1)")
+
+    with pytest.raises(ValueError):
+        get_public_base_url()
