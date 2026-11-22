@@ -122,6 +122,35 @@ def test_names_catalog_has_expected_ids():
     assert ids == list(range(1, 73))
 
 
+def test_names_catalog_matches_exodus_14_19_21():
+    # Masoretic consonantal text of Exodus 14:19-21 (72 letters per verse):
+    # v.19 forward, v.20 reversed, v.21 forward.
+    v19 = "ויסעמלאךהאלהיםההלךלפנימחנהישראלוילךמאחריהםויסעעמודהענןמפניהםויעמדמאחריהם"
+    v20 = "ויבאביןמחנהמצריםוביןמחנהישראלויהיהענןוהחשךויאראתהלילהולאקרבזהאלזהכלהלילה"
+    v21 = "ויטמשהאתידועלהיםויולךיהוהאתהיםברוחקדיםעזהכלהלילהוישםאתהיםלחרבהויבקעוהמים"
+    sofit_to_medial = str.maketrans("ךםןףץ", "כמנפצ")
+
+    assert len(v19) == len(v20) == len(v21) == 72
+    for idx, entry in enumerate(NAMES):
+        expected = (v19[idx] + v20[71 - idx] + v21[idx]).translate(sofit_to_medial)
+        actual = entry["name"].translate(sofit_to_medial)
+        assert actual == expected, f"Name #{entry['id']} {entry['name']} != {expected}"
+
+    assert NAMES[2]["name"] == "סיט"
+    assert NAMES[2]["transliteration"] == "Samech Yud Tet"
+
+
+def test_session_3_renders_corrected_triad():
+    client = app.test_client()
+
+    html = client.get("/session/3").data.decode("utf-8")
+
+    assert "סיט" in html
+    assert "Samech Yud Tet" in html
+    assert "סית" not in html
+    assert "Samech Yud Tav" not in html
+
+
 def test_app_runs_with_no_configuration_at_all():
     # Stateless by design: no SECRET_KEY, no .env, nothing to set before the
     # app can boot. This is what lets a preview deployment come up clean.
