@@ -1,7 +1,7 @@
 import os
 import subprocess
+import sys
 import tempfile
-from google import genai
 
 # The traditional 72 Names of God with their spiritual intentions
 NAMES = [
@@ -79,6 +79,17 @@ NAMES = [
     {"id": 72, "name": "מום", "transliteration": "Mem Vav Mem", "meaning": "Spiritual Cleansing", "theme": "Cleansing"},
 ]
 
+def _create_client(api_key):
+    try:
+        from google import genai
+    except ImportError as exc:
+        raise RuntimeError(
+            "google-genai is required to regenerate audio. "
+            "Install it with: pip install -r requirements-audio.txt"
+        ) from exc
+    return genai.Client(api_key=api_key)
+
+
 def generate_audio(name_data, output_dir, client):
     transliteration = name_data["transliteration"]
     output_file = os.path.join(output_dir, f"{name_data['id']}.mp3")
@@ -88,53 +99,70 @@ def generate_audio(name_data, output_dir, client):
         "Stretch out each syllable. Do not speak. Sing with a melodic, spiritual cadence. "
     )
 
-    try:
-        # Generate meditative chanting using Gemini 3.1 Flash TTS Preview
-        response = client.models.generate_content(
-            model='gemini-3.1-flash-tts-preview',
-            contents=prompt,
-            config={
-                'speech_config': {'voice_config': {'prebuilt_voice_config': {'voice_name': 'Charon'}}}
-            }
-        )
-        
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, 'inline_data') and part.inline_data:
-                # Capture raw audio data (PCM Linear 16, 24kHz)
-                with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as tmp:
-                    tmp.write(part.inline_data.data)
-                    tmp_path = tmp.name
-                
-                # Convert raw PCM to high-quality MP3 using ffmpeg
-                subprocess.run([
-                    "ffmpeg", "-y", "-f", "s16le", "-ar", "24000", "-ac", "1", 
-                    "-i", tmp_path, "-b:a", "128k", output_file
-                ], capture_output=True)
-                
-                os.unlink(tmp_path)
-                print(f"Generated: {output_file} (Chanted: {transliteration})")
-                return True
-        
-        print(f"Error: No audio data returned for {transliteration}")
-        return False
-        
-    except Exception as e:
-        print(f"Exception for {transliteration}: {str(e)}")
-        return False
+    response = client.models.generate_content(
+        model="gemini-3.1-flash-tts-preview",
+        contents=prompt,
+        config={
+            "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": "Charon"}}}
+        },
+    )
+
+    candidates = getattr(response, "candidates", None) or []
+    parts = getattr(candidates[0].content, "parts", None) if candidates and getattr(candidates[0], "content", None) else None
+    if not parts:
+        raise RuntimeError(f"No audio data returned for {transliteration}")
+
+    for part in parts:
+        inline_data = getattr(part, "inline_data", None)
+        if inline_data and getattr(inline_data, "data", None):
+            with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as tmp:
+                tmp.write(inline_data.data)
+                tmp_path = tmp.name
+
+            try:
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-f", "s16le", "-ar", "24000", "-ac", "1",
+                        "-i", tmp_path, "-b:a", "128k", output_file,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError("ffmpeg is not installed or not on PATH.") from exc
+            except subprocess.CalledProcessError as exc:
+                detail = (exc.stderr or exc.stdout or "").strip()
+                raise RuntimeError(
+                    f"ffmpeg failed for {output_file} (exit {exc.returncode}): {detail}"
+                ) from exc
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+
+            print(f"Generated: {output_file} (Chanted: {transliteration})")
+            return True
+
+    raise RuntimeError(f"No audio data returned for {transliteration}")
 
 
-if __name__ == "__main__":
-    api_key = os.environ.get("GEMINI_API_KEY")
+def main():
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
-        print("Error: GEMINI_API_KEY environment variable is required.")
-        exit(1)
+        print("Error: GEMINI_API_KEY environment variable is required.", file=sys.stderr)
+        return 1
 
-    client = genai.Client(api_key=api_key)
+    try:
+        client = _create_client(api_key)
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     output_dir = "static/audio"
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Starting generation of 72 Luminous Names with Gemini 'Charon' voice...")
-    
+    print("Starting generation of 72 Luminous Names with Gemini 'Charon' voice...")
+
     success_count = 0
     for name in NAMES:
         if generate_audio(name, output_dir, client):
@@ -142,3 +170,8 @@ if __name__ == "__main__":
 
     print(f"\n✓ Successfully generated {success_count}/72 high-quality meditative audio files.")
     print(f"Location: {output_dir}/")
+    return 0 if success_count == len(NAMES) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
