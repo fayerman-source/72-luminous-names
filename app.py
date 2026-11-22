@@ -155,14 +155,95 @@ NAMES = [
 ]
 
 
+SITUATION_GROUPS = [
+    {
+        "slug": "healing",
+        "label": "Healing & Renewal",
+        "ids": {2, 5, 7, 16, 18, 20, 21, 35, 54, 59, 61, 72},
+    },
+    {
+        "slug": "peace",
+        "label": "Peace & Letting Go",
+        "ids": {4, 8, 14, 24, 29, 32, 34, 44, 50, 51, 53, 56, 58, 60},
+    },
+    {
+        "slug": "clarity",
+        "label": "Clarity & Vision",
+        "ids": {1, 6, 15, 19, 26, 33, 37, 42, 46, 57, 65, 69, 70, 71},
+    },
+    {
+        "slug": "love",
+        "label": "Love & Connection",
+        "ids": {12, 13, 22, 23, 25, 28, 30, 40, 48, 62, 64, 68},
+    },
+    {
+        "slug": "protection",
+        "label": "Protection & Courage",
+        "ids": {9, 10, 11, 17, 36, 41, 43, 66},
+    },
+    {
+        "slug": "purpose",
+        "label": "Purpose, Action & Joy",
+        "ids": {3, 27, 31, 38, 39, 45, 47, 49, 52, 55, 63, 67},
+    },
+]
+
+GROUP_BY_NAME_ID = {
+    name_id: grp
+    for grp in SITUATION_GROUPS
+    for name_id in grp["ids"]
+}
+
+
+def filter_names(query="", group_slug=""):
+    normalized_q = (query or "").strip().lower()
+    normalized_group = (group_slug or "").strip().lower()
+    valid_slugs = {g["slug"] for g in SITUATION_GROUPS}
+    active_group = normalized_group if normalized_group in valid_slugs else ""
+
+    matched = []
+    for item in NAMES:
+        grp = GROUP_BY_NAME_ID.get(item["id"])
+        if active_group and (not grp or grp["slug"] != active_group):
+            continue
+        if normalized_q:
+            haystack = " ".join([
+                str(item["id"]),
+                item["name"],
+                item["transliteration"],
+                item["meaning"],
+                item["theme"],
+                grp["label"] if grp else "",
+            ]).lower()
+            if normalized_q not in haystack:
+                continue
+        matched.append(item)
+    return matched, active_group
+
+
 @app.route("/")
 def index():
-    return render_template("index.html", names=NAMES[:6])
+    return render_template(
+        "index.html",
+        names=NAMES[:6],
+        situation_groups=SITUATION_GROUPS,
+    )
 
 
 @app.route("/library")
 def library():
-    return render_template("library.html", names=NAMES)
+    query = request.args.get("q", "").strip()
+    group_slug = request.args.get("group", "").strip()
+    filtered_names, active_group = filter_names(query=query, group_slug=group_slug)
+    return render_template(
+        "library.html",
+        names=filtered_names,
+        total_count=len(NAMES),
+        query=query,
+        active_group=active_group,
+        situation_groups=SITUATION_GROUPS,
+        group_by_id=GROUP_BY_NAME_ID,
+    )
 
 
 @app.route("/session/<int:name_id>")
