@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 
@@ -139,3 +140,52 @@ def test_app_runs_with_no_configuration_at_all():
 
     assert result.returncode == 0, result.stderr
     assert "booted" in result.stdout
+
+
+def test_session_renders_breath_paced_player_controls_and_rtl_letters():
+    client = app.test_client()
+
+    html = client.get("/session/5").data.decode("utf-8")
+
+    assert 'dir="rtl"' in html
+    assert '<span class="hebrew-letter" data-letter-index="0">מ</span>' in html
+    assert '<span class="hebrew-letter" data-letter-index="1">ה</span>' in html
+    assert '<span class="hebrew-letter" data-letter-index="2">ש</span>' in html
+    for minutes, seconds in [("3 minutes", "180"), ("5 minutes", "300"), ("11 minutes", "660"), ("18 minutes", "1080")]:
+        assert f'<option value="{seconds}"' in html
+        assert minutes in html
+    for interval in ["4", "6", "8"]:
+        assert f'<option value="{interval}"' in html
+    assert 'id="drone-enabled"' in html
+    assert 'src="/static/player.js"' in html
+
+    js_resp = client.get("/static/player.js")
+    assert js_resp.status_code == 200
+    assert b"AudioContext" in js_resp.data
+
+
+def test_player_js_helpers_progress_letters_and_breath_phases():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const assert = require("assert");
+    const player = require("./static/player.js");
+    assert.strictEqual(player.formatRemainingSeconds(300), "05:00");
+    assert.strictEqual(player.formatRemainingSeconds(65), "01:05");
+    assert.strictEqual(player.computeActiveLetterIndex(1, 18, 3), 0);
+    assert.strictEqual(player.computeActiveLetterIndex(7, 18, 3), 1);
+    assert.strictEqual(player.computeActiveLetterIndex(15, 18, 3), 2);
+    assert.ok(player.computeBreathPhase(1, 6).includes("Inhale"));
+    assert.ok(player.computeBreathPhase(4, 6).includes("Exhale"));
+    console.log("player-js-ok");
+    """
+    result = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "player-js-ok" in result.stdout
