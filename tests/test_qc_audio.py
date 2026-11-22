@@ -101,3 +101,42 @@ def test_evaluate_catalog_flags_excessive_catalog_loudness_spread():
     assert by_id[1] == []
     assert "TOO_QUIET" in by_id[36]
     assert any(i.startswith("LOUDNESS_SWING(") for i in by_id[45])
+
+
+def test_run_qc_passes_configured_silence_threshold_into_silencedetect_filter(monkeypatch, tmp_path, capsys):
+    import scripts.qc_audio as qc_mod
+    from types import SimpleNamespace
+
+    for idx in range(1, 73):
+        (tmp_path / f"{idx}.mp3").write_bytes(b"x" * 60 * 1024)
+
+    monkeypatch.setattr(qc_mod, "get_audio_info", lambda _p: {"format": {"duration": "20.0"}})
+
+    captured_filters = []
+
+    def fake_run(cmd, **_kwargs):
+        af_idx = cmd.index("-af") + 1
+        captured_filters.append(cmd[af_idx])
+        # Track 1 has a 3.0s dropout (caught when --max-silence 2.0 is passed to silencedetect)
+        is_first = str(cmd[cmd.index("-i") + 1]).endswith("/1.mp3")
+        sil_lines = (
+            "[silencedetect @ 0x1] silence_start: 5.0\n"
+            "[silencedetect @ 0x1] silence_end: 8.0 | silence_duration: 3.0\n"
+            if is_first
+            else ""
+        )
+        stderr = (
+            f"{sil_lines}"
+            "[Parsed_volumedetect_0 @ 0x2] mean_volume: -24.0 dB\n"
+            "[Parsed_volumedetect_0 @ 0x2] max_volume: -6.0 dB\n"
+        )
+        return SimpleNamespace(returncode=0, stdout="", stderr=stderr)
+
+    monkeypatch.setattr(qc_mod.subprocess, "run", fake_run)
+
+    rc = qc_mod.main(["--audio-dir", str(tmp_path), "--max-silence", "2.0"])
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert captured_filters[0] == "volumedetect,silencedetect=noise=-45.0dB:d=2.0"
+    assert "LONG_SILENCE(3.0s)" in out

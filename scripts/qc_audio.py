@@ -79,9 +79,10 @@ def get_audio_info(file_path):
         return None
 
 
-def get_audio_stats(file_path, total_duration=0.0):
+def get_audio_stats(file_path, total_duration=0.0, min_silence_sec=MIN_SILENCE_DETECT_SEC):
+    detect_sec = max(0.1, float(min_silence_sec))
     filter_chain = (
-        f"volumedetect,silencedetect=noise={SILENCE_NOISE_DB}dB:d={MIN_SILENCE_DETECT_SEC}"
+        f"volumedetect,silencedetect=noise={SILENCE_NOISE_DB}dB:d={detect_sec}"
     )
     cmd = [
         "ffmpeg", "-i", str(file_path), "-af", filter_chain, "-f", "null", os.devnull,
@@ -215,7 +216,11 @@ def run_qc(
             continue
 
         duration = float(info["format"]["duration"])
-        stats = get_audio_stats(file_path, total_duration=duration)
+        stats = get_audio_stats(
+            file_path,
+            total_duration=duration,
+            min_silence_sec=max_silence_sec,
+        )
         raw_tracks.append({
             "id": i,
             "exists": True,
