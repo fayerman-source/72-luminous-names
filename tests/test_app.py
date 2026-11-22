@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 
@@ -139,3 +140,73 @@ def test_app_runs_with_no_configuration_at_all():
 
     assert result.returncode == 0, result.stderr
     assert "booted" in result.stdout
+
+
+def test_pages_include_local_practice_tracker_without_cookies():
+    client = app.test_client()
+
+    for path in ["/", "/library", "/session/1"]:
+        resp = client.get(path)
+        html = resp.data.decode("utf-8")
+        assert resp.status_code == 200
+        assert 'id="practice-summary-badge"' in html
+        assert 'src="/static/practice.js"' in html
+        assert "Set-Cookie" not in resp.headers
+
+    js_resp = client.get("/static/practice.js")
+    assert js_resp.status_code == 200
+    assert b"luminous72.practice.v1" in js_resp.data
+
+
+def test_practice_js_saved_names_and_day_counter_logic():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const assert = require("assert");
+    const p = require("./static/practice.js");
+
+    let state = p.normalizeState({});
+    assert.deepStrictEqual(state, { savedIds: [], practicedDates: [], completedNameIds: [] });
+
+    state = p.toggleSavedName(state, 5);
+    state = p.toggleSavedName(state, 12);
+    assert.deepStrictEqual(state.savedIds, [5, 12]);
+    state = p.toggleSavedName(state, 5);
+    assert.deepStrictEqual(state.savedIds, [12]);
+
+    // Invalid IDs are ignored
+    state = p.toggleSavedName(state, 999);
+    state = p.toggleSavedName(state, 0);
+    assert.deepStrictEqual(state.savedIds, [12]);
+
+    // Recording twice on the same calendar day increments the day counter only once
+    state = p.recordPracticeDay(state, 5, "2026-11-21");
+    state = p.recordPracticeDay(state, 12, "2026-11-21");
+    assert.strictEqual(p.getDayProgress(state).totalDays, 1);
+    assert.strictEqual(p.getDayProgress(state).cycleDay, 1);
+    assert.deepStrictEqual(state.completedNameIds, [5, 12]);
+
+    state = p.recordPracticeDay(state, 13, "2026-11-22");
+    assert.strictEqual(p.getDayProgress(state).totalDays, 2);
+    assert.strictEqual(p.getDayProgress(state).cycleDay, 2);
+
+    // Day 73 wraps to cycle day 1 while preserving total days practiced
+    const seventyThreeDays = Array.from({ length: 73 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 0, 1 + i));
+      return d.toISOString().slice(0, 10);
+    });
+    const wrapped = p.getDayProgress({ savedIds: [], practicedDates: seventyThreeDays, completedNameIds: [] });
+    assert.strictEqual(wrapped.totalDays, 73);
+    assert.strictEqual(wrapped.cycleDay, 1);
+    console.log("practice-js-ok");
+    """
+    result = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "practice-js-ok" in result.stdout
