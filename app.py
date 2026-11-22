@@ -82,7 +82,7 @@ def inject_public_urls():
 NAMES = [
     {"id": 1, "name": "והו", "transliteration": "Vav Hey Vav", "meaning": "Time Travel / Return to Creation", "theme": "Time Travel"},
     {"id": 2, "name": "ילי", "transliteration": "Yud Lamed Yud", "meaning": "Recapturing the Sparks", "theme": "Recapturing Sparks"},
-    {"id": 3, "name": "סית", "transliteration": "Samech Yud Tav", "meaning": "Miracle Making", "theme": "Miracle Making"},
+    {"id": 3, "name": "סיט", "transliteration": "Samech Yud Tet", "meaning": "Miracle Making", "theme": "Miracle Making"},
     {"id": 4, "name": "עלם", "transliteration": "Ayin Lamed Mem", "meaning": "Eliminating Negative Thoughts", "theme": "Negative Thoughts"},
     {"id": 5, "name": "מהש", "transliteration": "Mem Hey Shin", "meaning": "Healing", "theme": "Healing"},
     {"id": 6, "name": "ללה", "transliteration": "Lamed Lamed Hey", "meaning": "Dream State", "theme": "Dream State"},

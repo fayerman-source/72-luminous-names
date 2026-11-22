@@ -17,10 +17,10 @@ Based on the intersection of ancient Kabbalistic tradition and modern evolutiona
 ## 🛠️ Key Features
 
 - **☀️ Supramental Focus:** Designed for the manifestation of light, moving from the obscure to the openly radiant.
-- **🛡️ Secure & Lightweight:** Built with Flask, utilizing environment-based configuration for production-grade security.
-- **🎧 Local Audio Synthesis:** Integrated `ffmpeg` engine to generate meditative frequencies for all 72 names locally.
+- **🛡️ Stateless & Lightweight:** Built with Flask with zero required runtime secrets or user accounts.
+- **🎧 Pre-Generated Chants & Audio Pipeline:** Ships with all 72 `.mp3` chants in `static/audio/`, plus an optional Gemini TTS + `ffmpeg` script (`generate_audio.py`) for regenerating audio assets.
 - **📖 Enhanced Catalog:** Includes traditional spiritual intentions (e.g., Healing, Miracle Making, Protection) for each name.
-- **🚀 Deploy-Ready:** Optimized for Vercel with seamless environment variable handling.
+- **🚀 Deploy-Ready:** Optimized for Vercel with zero required runtime configuration.
 
 
 ## 🚀 Live Demo
@@ -30,7 +30,7 @@ Experience the platform live: **[72-luminous-names.vercel.app](https://72-lumino
 ## 🛠️ Quick Start
 
 ### 1. Prerequisites
-Ensure you have Python 3.10+ and `ffmpeg` (for audio generation) installed.
+Ensure you have Python 3.10+ installed. (`ffmpeg` and `GEMINI_API_KEY` are only needed if you want to regenerate the audio files.)
 
 ### 2. Installation
 ```bash
@@ -44,9 +44,11 @@ pip install -r requirements.txt
 ### 3. Local Environment
 No configuration required — the app is stateless and boots with no `.env`.
 
-### 4. Generate Audio Assets
-To synthesize the meditative placeholder tones:
+### 4. Regenerate Audio Assets (Optional)
+All 72 `.mp3` chants are already included in `static/audio/`. To regenerate them via Gemini TTS (`gemini-3.1-flash-tts-preview`) and `ffmpeg`:
 ```bash
+pip install -r requirements-audio.txt
+export GEMINI_API_KEY="your-api-key"
 python generate_audio.py
 ```
 
