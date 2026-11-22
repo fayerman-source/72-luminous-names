@@ -12,6 +12,18 @@
     </div>
 </section>
 
+<section id="moment-card" aria-label="Name for the current time window" style="max-width: 640px; margin: 0 auto 20px; background: #14141a; border: 1px solid #2a2a35; border-radius: 14px; padding: 28px; text-align: center;">
+    <div id="moment-window-label" style="color: #888; font-size: 0.85rem; letter-spacing: 0.04em; margin-bottom: 8px;">
+        Current 20-minute window · {{ moment.window_start }}–{{ moment.window_end }} ({{ moment.tz_label }}) · #{{ moment.name.id }} of 72
+    </div>
+    <div id="moment-hebrew" style="font-size: 3rem; color: #d4af37; margin-bottom: 6px;">{{ moment.name.name }}</div>
+    <h2 id="moment-translit" style="font-size: 1.4rem; color: #fff; margin-bottom: 4px;">{{ moment.name.transliteration }}</h2>
+    <p id="moment-meaning" style="color: #999; font-size: 0.95rem; margin-bottom: 18px;">{{ moment.name.meaning }} — {{ moment.name.theme }}</p>
+    <a id="moment-link" href="/session/{{ moment.name.id }}" class="btn btn-secondary" style="padding: 10px 24px;">▶ Meditate with this Name</a>
+</section>
+<script id="names-catalog-json" type="application/json">{{ all_names | tojson }}</script>
+<script src="/static/moment.js" defer></script>
+
 <section style="margin-top: 60px;">
     <h2 style="text-align: center; margin-bottom: 40px;">Start with one</h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">

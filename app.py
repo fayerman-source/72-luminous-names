@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from flask import Flask, Response, abort, render_template, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
@@ -94,9 +95,47 @@ NAMES = [
 ]
 
 
+MINUTES_PER_WINDOW = 20
+WINDOWS_PER_DAY = 72
+
+
+def _format_hhmm(total_minutes):
+    wrapped = total_minutes % (24 * 60)
+    return f"{wrapped // 60:02d}:{wrapped % 60:02d}"
+
+
+def name_for_moment(dt=None):
+    """Return the Name and 20-minute diurnal window for a given datetime.
+
+    Rule: 24 hours (1,440 minutes) divided into 72 consecutive 20-minute windows
+    starting at 00:00 (`slot = (hour * 60 + minute) // 20`, `name_id = slot + 1`),
+    following the classical 72-quinary (5 degrees / 20 minutes of diurnal rotation
+    per Name) correspondence table (Kircher, Oedipus Aegyptiacus II.2; Regardie,
+    The Golden Dawn, Shem HaMephorash quinaries) adapted to civil clock midnight.
+    """
+    current = dt if dt is not None else datetime.now(timezone.utc)
+    minute_of_day = current.hour * 60 + current.minute
+    slot_index = minute_of_day // MINUTES_PER_WINDOW
+    start_min = slot_index * MINUTES_PER_WINDOW
+    end_min = start_min + MINUTES_PER_WINDOW
+    entry = NAMES[slot_index]
+    return {
+        "name": entry,
+        "slot_index": slot_index,
+        "window_start": _format_hhmm(start_min),
+        "window_end": _format_hhmm(end_min),
+        "tz_label": current.tzname() or "UTC",
+    }
+
+
 @app.route("/")
 def index():
-    return render_template("index.html", names=NAMES[:6])
+    return render_template(
+        "index.html",
+        names=NAMES[:6],
+        all_names=NAMES,
+        moment=name_for_moment(),
+    )
 
 
 @app.route("/library")
