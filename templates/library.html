@@ -32,9 +32,9 @@
         {% endif %}
     </form>
     <div class="group-pills" role="navigation" aria-label="Filter by situation">
-        <a href="/library" data-group="" class="group-pill {% if not active_group %}is-active{% endif %}">All 72</a>
+        <a href="{{ url_for('library', q=query) if query else url_for('library') }}" data-group="" class="group-pill {% if not active_group %}is-active{% endif %}">All 72</a>
         {% for grp in situation_groups %}
-        <a href="/library?group={{ grp.slug }}" data-group="{{ grp.slug }}" class="group-pill {% if active_group == grp.slug %}is-active{% endif %}">{{ grp.label }}</a>
+        <a href="{{ url_for('library', group=grp.slug, q=query) if query else url_for('library', group=grp.slug) }}" data-group="{{ grp.slug }}" class="group-pill {% if active_group == grp.slug %}is-active{% endif %}">{{ grp.label }}</a>
         {% endfor %}
     </div>
 </div>

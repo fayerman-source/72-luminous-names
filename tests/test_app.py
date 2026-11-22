@@ -160,6 +160,12 @@ def test_library_filters_by_query_and_situation_group():
     assert 'href="/session/56"' in anger_html
     assert "Dispelling Anger" in anger_html
     assert 'href="/session/1"' not in anger_html
+    assert 'href="/library?q=anger"' in anger_html
+    assert 'href="/library?group=peace&amp;q=anger"' in anger_html
+
+    encoded_resp = client.get("/library?q=time+travel")
+    encoded_html = encoded_resp.data.decode("utf-8")
+    assert 'href="/library?group=clarity&amp;q=time+travel"' in encoded_html
 
     healing_resp = client.get("/library?group=healing")
     healing_html = healing_resp.data.decode("utf-8")
