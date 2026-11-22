@@ -131,12 +131,18 @@
     return match ? validNameId(Number(match[1])) : null;
   }
 
-  function initDom() {
+  function initDom(nowProvider) {
     if (typeof document === "undefined") return;
 
+    var getNow = typeof nowProvider === "function" ? nowProvider : function () { return new Date(); };
     var state = loadState();
-    var today = formatLocalDate(new Date());
+    var lastRenderedDay = formatLocalDate(getNow());
     var badgeEl = document.getElementById("practice-summary-badge");
+    var refreshActiveView = null;
+
+    function currentToday() {
+      return formatLocalDate(getNow());
+    }
 
     function renderHeaderBadge() {
       if (!badgeEl) return;
@@ -182,6 +188,8 @@
         playerRoot.insertBefore(bar, anchorTarget);
 
         function renderSessionControls() {
+          var today = currentToday();
+          lastRenderedDay = today;
           var isSaved = state.savedIds.indexOf(sessionId) !== -1;
           var practicedToday = state.practicedDates.indexOf(today) !== -1;
           var prog = getDayProgress(state);
@@ -201,20 +209,22 @@
           renderHeaderBadge();
         }
 
+        refreshActiveView = renderSessionControls;
+
         saveBtn.addEventListener("click", function () {
-          state = saveState(toggleSavedName(state, sessionId));
+          state = saveState(toggleSavedName(loadState(), sessionId));
           renderSessionControls();
         });
 
         markBtn.addEventListener("click", function () {
-          state = saveState(recordPracticeDay(state, sessionId, today));
+          state = saveState(recordPracticeDay(loadState(), sessionId, currentToday()));
           renderSessionControls();
         });
 
         var audioEl = playerRoot.querySelector("audio");
         if (audioEl) {
           audioEl.addEventListener("ended", function () {
-            state = saveState(recordPracticeDay(state, sessionId, today));
+            state = saveState(recordPracticeDay(loadState(), sessionId, currentToday()));
             renderSessionControls();
           });
         }
@@ -298,7 +308,10 @@
           renderHeaderBadge();
         }
 
+        refreshActiveView = renderLibraryPractice;
+
         savedToggle.addEventListener("click", function () {
+          state = loadState();
           filterSavedOnly = !filterSavedOnly;
           renderLibraryPractice();
         });
@@ -307,12 +320,43 @@
       }
     }
 
+    function syncExternalState() {
+      state = loadState();
+      if (refreshActiveView) {
+        refreshActiveView();
+      } else {
+        renderHeaderBadge();
+      }
+    }
+
+    if (typeof window !== "undefined" && window.addEventListener) {
+      window.addEventListener("storage", function (ev) {
+        if (!ev || !ev.key || ev.key === STORAGE_KEY) {
+          syncExternalState();
+        }
+      });
+      window.addEventListener("focus", syncExternalState);
+    }
+    if (document.addEventListener) {
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) syncExternalState();
+      });
+    }
+    var midnightTimer = setInterval(function () {
+      if (currentToday() !== lastRenderedDay) {
+        syncExternalState();
+      }
+    }, 60000);
+    if (midnightTimer && typeof midnightTimer.unref === "function") {
+      midnightTimer.unref();
+    }
+
     renderHeaderBadge();
   }
 
   if (typeof document !== "undefined") {
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", initDom);
+      document.addEventListener("DOMContentLoaded", function () { initDom(); });
     } else {
       initDom();
     }
@@ -324,6 +368,7 @@
     formatLocalDate: formatLocalDate,
     toggleSavedName: toggleSavedName,
     recordPracticeDay: recordPracticeDay,
-    getDayProgress: getDayProgress
+    getDayProgress: getDayProgress,
+    initDom: initDom
   };
 });
