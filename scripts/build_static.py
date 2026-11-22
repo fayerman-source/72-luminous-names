@@ -13,6 +13,64 @@ from app import app  # noqa: E402
 
 DEFAULT_BASE_URL = "https://72-luminous-names.vercel.app"
 SITEMAP_NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+EXPORT_MARKER = ".static_export_manifest"
+PROTECTED_REPO_DIRS = {
+    ".git",
+    ".github",
+    "static",
+    "templates",
+    "tests",
+    "scripts",
+    ".venv",
+    "venv",
+    "env",
+}
+
+
+def validate_output_dir(output_dir, repo_root: Path = ROOT, static_src=None) -> Path:
+    raw_path = Path(output_dir)
+    if raw_path.is_symlink():
+        raise ValueError(f"Refusing to use symlink as output directory: {raw_path}")
+
+    out_root = raw_path.resolve()
+    resolved_repo = Path(repo_root).resolve()
+    resolved_home = Path.home().resolve()
+
+    if out_root == Path(out_root.anchor) or out_root == resolved_home:
+        raise ValueError(f"Refusing to use unsafe system path as output directory: {out_root}")
+
+    if out_root == resolved_repo or resolved_repo.is_relative_to(out_root):
+        raise ValueError(
+            f"Refusing to use repository root or its ancestor as output directory: {out_root}"
+        )
+
+    if static_src is not None:
+        resolved_static = Path(static_src).resolve()
+        if (
+            out_root == resolved_static
+            or out_root.is_relative_to(resolved_static)
+            or resolved_static.is_relative_to(out_root)
+        ):
+            raise ValueError(
+                f"Refusing to use static source directory as output directory: {out_root}"
+            )
+
+    if out_root.is_relative_to(resolved_repo):
+        top_part = out_root.relative_to(resolved_repo).parts[0]
+        if top_part in PROTECTED_REPO_DIRS or (resolved_repo / top_part).is_file():
+            raise ValueError(
+                f"Refusing to overwrite repository source path: {out_root}"
+            )
+
+    if out_root.exists():
+        if not out_root.is_dir():
+            raise ValueError(f"Output path exists and is not a directory: {out_root}")
+        if any(out_root.iterdir()) and not (out_root / EXPORT_MARKER).is_file():
+            raise ValueError(
+                f"Refusing to delete non-empty directory without {EXPORT_MARKER}: {out_root}"
+            )
+
+    return out_root
 
 
 def route_to_output_path(output_dir: Path, route_path: str) -> Path:
@@ -52,10 +110,15 @@ def export_static_site(
     base_url=DEFAULT_BASE_URL,
     include_audio=True,
 ):
-    out_root = Path(output_dir).resolve()
+    out_root = validate_output_dir(
+        output_dir,
+        repo_root=ROOT,
+        static_src=flask_app.static_folder,
+    )
     if out_root.exists():
         shutil.rmtree(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / EXPORT_MARKER).write_text("72-luminous-names static export\n", encoding="utf-8")
 
     clean_base = base_url.rstrip("/")
     client = flask_app.test_client()
