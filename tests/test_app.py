@@ -1,11 +1,20 @@
+from datetime import datetime, timezone
 from pathlib import Path
+import json
 import os
 import shutil
 import subprocess
 import sys
 import pytest
 
-from app import GROUP_BY_NAME_ID, NAMES, SITUATION_GROUPS, app, get_public_base_url
+from app import (
+    GROUP_BY_NAME_ID,
+    NAMES,
+    SITUATION_GROUPS,
+    app,
+    get_public_base_url,
+    name_for_moment,
+)
 
 
 def test_home_page_links_into_the_catalog():
@@ -170,6 +179,83 @@ def test_app_runs_with_no_configuration_at_all():
 
     assert result.returncode == 0, result.stderr
     assert "booted" in result.stdout
+
+
+def test_name_for_moment_cycle_boundaries():
+    cases = [
+        ((0, 0, 0), 1, "00:00", "00:20"),
+        ((0, 19, 59), 1, "00:00", "00:20"),
+        ((0, 20, 0), 2, "00:20", "00:40"),
+        ((11, 59, 59), 36, "11:40", "12:00"),
+        ((12, 0, 0), 37, "12:00", "12:20"),
+        ((23, 39, 59), 71, "23:20", "23:40"),
+        ((23, 40, 0), 72, "23:40", "00:00"),
+        ((23, 59, 59), 72, "23:40", "00:00"),
+    ]
+    for (hh, mm, ss), expected_id, expected_start, expected_end in cases:
+        dt = datetime(2026, 11, 22, hh, mm, ss, tzinfo=timezone.utc)
+        res = name_for_moment(dt)
+        assert res["name"]["id"] == expected_id
+        assert res["window_start"] == expected_start
+        assert res["window_end"] == expected_end
+
+    # Every one of the 72 Names covers exactly 20 minutes across the 1,440-minute day
+    counts = {}
+    for minute_of_day in range(24 * 60):
+        dt = datetime(2026, 11, 22, minute_of_day // 60, minute_of_day % 60, tzinfo=timezone.utc)
+        nid = name_for_moment(dt)["name"]["id"]
+        counts[nid] = counts.get(nid, 0) + 1
+    assert set(counts.keys()) == set(range(1, 73))
+    assert all(c == 20 for c in counts.values())
+
+
+def test_home_page_renders_server_moment_and_client_updater(monkeypatch):
+    import app as app_mod
+
+    fixed_dt = datetime(2026, 11, 22, 23, 45, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(app_mod, "name_for_moment", lambda dt=None: name_for_moment(fixed_dt))
+
+    client = app.test_client()
+    html = client.get("/").data.decode("utf-8")
+
+    assert 'id="moment-card"' in html
+    assert "23:40–00:00 (UTC)" in html
+    assert "#72 of 72" in html
+    assert 'href="/session/72"' in html
+    assert 'src="/static/moment.js"' in html
+
+
+def test_browser_and_server_moment_rules_match_across_entire_day():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const m = require("./static/moment.js");
+    const out = [];
+    for (let h = 0; h < 24; h++) {
+      for (let min = 0; min < 60; min++) {
+        out.push(m.computeMomentWindow(h, min));
+      }
+    }
+    console.log(JSON.stringify(out));
+    """
+    proc = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    js_windows = json.loads(proc.stdout)
+    assert len(js_windows) == 1440
+
+    for idx, js_win in enumerate(js_windows):
+        dt = datetime(2026, 11, 22, idx // 60, idx % 60, tzinfo=timezone.utc)
+        py_win = name_for_moment(dt)
+        assert js_win["nameId"] == py_win["name"]["id"]
+        assert js_win["windowStart"] == py_win["window_start"]
+        assert js_win["windowEnd"] == py_win["window_end"]
 
 
 def test_pages_include_local_practice_tracker_without_cookies():
