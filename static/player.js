@@ -162,6 +162,7 @@
     var tickTimer = null;
     var breathTimeout = null;
     var wakeLockSentinel = null;
+    var sessionToken = 0;
 
     function setHighlightedLetter(activeIndex) {
       letterEls.forEach(function (el, idx) {
@@ -179,9 +180,15 @@
       timerEl.textContent = formatRemainingSeconds(secs) + " session ready";
     }
 
-    function acquireWakeLock() {
+    function acquireWakeLock(expectedToken) {
       if (navigator.wakeLock && navigator.wakeLock.request) {
         navigator.wakeLock.request("screen").then(function (sentinel) {
+          if (!running || sessionToken !== expectedToken) {
+            if (sentinel && sentinel.release) {
+              sentinel.release().catch(function () {});
+            }
+            return;
+          }
           wakeLockSentinel = sentinel;
         }).catch(function () {});
       }
@@ -213,6 +220,7 @@
     }
 
     function stopSession(completed) {
+      sessionToken += 1;
       running = false;
       inBreathPause = false;
       if (tickTimer) {
@@ -276,10 +284,11 @@
       pauseTotalSec = Number(intervalSelect.value) || 6;
       sessionEndMs = Date.now() + durationSec * 1000;
       cycleCount = 0;
+      sessionToken += 1;
       running = true;
       toggleBtn.textContent = "End Session";
       toggleBtn.setAttribute("aria-pressed", "true");
-      acquireWakeLock();
+      acquireWakeLock(sessionToken);
 
       if (droneCheckbox && droneCheckbox.checked) {
         drone.playChime();
@@ -288,6 +297,19 @@
       startChantCycle();
       onTick();
       tickTimer = setInterval(onTick, 200);
+    });
+
+    audio.addEventListener("play", function () {
+      if (!running || !inBreathPause) return;
+      if (breathTimeout) {
+        clearTimeout(breathTimeout);
+        breathTimeout = null;
+      }
+      inBreathPause = false;
+      cycleCount += 1;
+      if (cueEl) {
+        cueEl.textContent = "Chanting — follow each illuminated letter right to left";
+      }
     });
 
     audio.addEventListener("timeupdate", function () {
@@ -352,6 +374,7 @@
   return {
     formatRemainingSeconds: formatRemainingSeconds,
     computeActiveLetterIndex: computeActiveLetterIndex,
-    computeBreathPhase: computeBreathPhase
+    computeBreathPhase: computeBreathPhase,
+    initDomPlayer: initDomPlayer
   };
 });

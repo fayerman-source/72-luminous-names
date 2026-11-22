@@ -189,3 +189,103 @@ def test_player_js_helpers_progress_letters_and_breath_phases():
     )
     assert result.returncode == 0, result.stderr
     assert "player-js-ok" in result.stdout
+
+
+def test_player_js_releases_late_wakelock_and_cancels_breath_timeout_on_manual_play():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const assert = require("assert");
+
+    function makeElem(initialValue) {
+      const listeners = {};
+      return {
+        value: initialValue || "",
+        checked: false,
+        textContent: "",
+        paused: true,
+        currentTime: 0,
+        duration: 18,
+        attrs: {},
+        classList: { add() {}, remove() {} },
+        setAttribute(k, v) { this.attrs[k] = v; },
+        addEventListener(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+        emit(ev) { (listeners[ev] || []).forEach(fn => fn()); },
+        play() { this.paused = false; this.emit("play"); return Promise.resolve(); },
+        pause() { this.paused = true; }
+      };
+    }
+
+    const els = {
+      "chant-audio": makeElem(),
+      "session-toggle-btn": makeElem(),
+      "session-duration": makeElem("180"),
+      "breath-interval": makeElem("1"),
+      "drone-enabled": makeElem(),
+      "breath-cue": makeElem(),
+      "session-timer": makeElem()
+    };
+
+    let resolveWakeLock;
+    let sentinelReleased = 0;
+    const sentinel = { release() { sentinelReleased += 1; return Promise.resolve(); } };
+
+    global.window = { addEventListener() {} };
+    Object.defineProperty(globalThis, "navigator", {
+      value: {
+        wakeLock: {
+          request() {
+            return new Promise(res => { resolveWakeLock = res; });
+          }
+        }
+      },
+      configurable: true
+    });
+    global.document = {
+      readyState: "complete",
+      getElementById(id) { return els[id] || null; },
+      querySelectorAll() { return [makeElem(), makeElem(), makeElem()]; }
+    };
+
+    const player = require("./static/player.js");
+
+    // 1. Start session, then stop BEFORE wakeLock promise resolves -> sentinel must release immediately on resolve
+    els["session-toggle-btn"].emit("click");
+    els["session-toggle-btn"].emit("click");
+    resolveWakeLock(sentinel);
+
+    setImmediate(() => {
+      assert.strictEqual(sentinelReleased, 1, "Late wakeLock sentinel should be released");
+
+      // 2. Start session, finish first chant -> enter breath pause -> user manually plays audio
+      els["breath-interval"].value = "0.05";
+      els["session-toggle-btn"].emit("click");
+      resolveWakeLock(sentinel);
+      els["chant-audio"].paused = true;
+      els["chant-audio"].emit("ended");
+      assert.ok(els["breath-cue"].textContent.includes("Inhale"));
+
+      // Simulate native Play mid-breath-pause at currentTime = 5s
+      els["chant-audio"].currentTime = 5;
+      els["chant-audio"].paused = false;
+      els["chant-audio"].emit("play");
+      assert.ok(els["breath-cue"].textContent.includes("Chanting"));
+
+      setTimeout(() => {
+        // Stale breathTimeout must NOT have fired and reset currentTime to 0
+        assert.strictEqual(els["chant-audio"].currentTime, 5);
+        els["session-toggle-btn"].emit("click");
+        console.log("player-dom-edge-cases-ok");
+      }, 90);
+    });
+    """
+    result = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "player-dom-edge-cases-ok" in result.stdout
