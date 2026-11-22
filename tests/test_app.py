@@ -204,3 +204,68 @@ def test_invalid_public_base_url_is_rejected(monkeypatch):
 
     with pytest.raises(ValueError):
         get_public_base_url()
+
+
+def test_production_host_works_with_no_new_environment_variables():
+    base_env = os.environ.copy()
+    for var in ("PUBLIC_BASE_URL", "TRUSTED_HOSTS", "TRUST_PROXY", "SECRET_KEY", "FLASK_DEBUG", "VERCEL"):
+        base_env.pop(var, None)
+
+    probe = """
+import app as app_mod
+
+client = app_mod.app.test_client()
+for path in ["/", "/library", "/session/1", "/sitemap.xml", "/robots.txt"]:
+    r = client.get(path, headers={"Host": "72-luminous-names.vercel.app"})
+    assert r.status_code == 200, (path, r.status_code)
+
+preview = client.get("/", headers={"Host": "72-luminous-names-git-main-fayerman.vercel.app"})
+assert preview.status_code == 200
+print("prod-host-direct-ok")
+"""
+    direct = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=Path(__file__).resolve().parents[1],
+        env=base_env,
+        capture_output=True,
+        text=True,
+    )
+    assert direct.returncode == 0, direct.stderr
+    assert "prod-host-direct-ok" in direct.stdout
+
+    vercel_env = base_env.copy()
+    vercel_env["VERCEL"] = "1"
+    vercel_probe = """
+import app as app_mod
+
+client = app_mod.app.test_client()
+for path in ["/", "/library", "/session/1", "/sitemap.xml", "/robots.txt"]:
+    r = client.get(
+        path,
+        headers={
+            "Host": "internal-lambda.local",
+            "X-Forwarded-Host": "72-luminous-names.vercel.app",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+    assert r.status_code == 200, (path, r.status_code)
+html = client.get(
+    "/session/1",
+    headers={
+        "Host": "internal-lambda.local",
+        "X-Forwarded-Host": "72-luminous-names.vercel.app",
+        "X-Forwarded-Proto": "https",
+    },
+).data.decode("utf-8")
+assert 'rel="canonical" href="https://72-luminous-names.vercel.app/session/1"' in html
+print("prod-host-vercel-ok")
+"""
+    on_vercel = subprocess.run(
+        [sys.executable, "-c", vercel_probe],
+        cwd=Path(__file__).resolve().parents[1],
+        env=vercel_env,
+        capture_output=True,
+        text=True,
+    )
+    assert on_vercel.returncode == 0, on_vercel.stderr
+    assert "prod-host-vercel-ok" in on_vercel.stdout

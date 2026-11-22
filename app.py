@@ -39,6 +39,12 @@ def get_trusted_hosts():
     public_host = urlsplit(get_public_base_url()).hostname
     if public_host and public_host not in hosts:
         hosts.append(public_host)
+    for vercel_var in ("VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        raw_host = os.environ.get(vercel_var, "").strip()
+        if raw_host:
+            parsed_host = urlsplit(raw_host if "://" in raw_host else f"https://{raw_host}").hostname
+            if parsed_host and parsed_host not in hosts:
+                hosts.append(parsed_host)
     return hosts
 
 
