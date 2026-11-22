@@ -1,12 +1,59 @@
 from flask import Flask, Response, abort, render_template, request, url_for
+from urllib.parse import urlsplit
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.sansio.utils import host_is_trusted
+from xml.sax.saxutils import escape
 import os
+
+DEFAULT_PUBLIC_BASE_URL = "https://72-luminous-names.vercel.app"
+
+
+def env_flag_enabled(name):
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_public_base_url():
+    raw = os.environ.get("PUBLIC_BASE_URL", "").strip() or DEFAULT_PUBLIC_BASE_URL
+    parsed = urlsplit(raw)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or any(ch in parsed.netloc for ch in '/?#@<>"\'& \t\r\n')
+    ):
+        raise ValueError(f"Invalid PUBLIC_BASE_URL: {raw!r}")
+    return f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
+
+
+def public_url(path):
+    normalized = path if path.startswith("/") else f"/{path}"
+    return f"{get_public_base_url()}{normalized}"
+
+
+def get_trusted_hosts():
+    configured = os.environ.get("TRUSTED_HOSTS", "").strip()
+    if configured:
+        return [h.strip() for h in configured.split(",") if h.strip()]
+    hosts = ["localhost", "127.0.0.1", ".vercel.app"]
+    public_host = urlsplit(get_public_base_url()).hostname
+    if public_host and public_host not in hosts:
+        hosts.append(public_host)
+    for vercel_var in ("VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        raw_host = os.environ.get(vercel_var, "").strip()
+        if raw_host:
+            parsed_host = urlsplit(raw_host if "://" in raw_host else f"https://{raw_host}").hostname
+            if parsed_host and parsed_host not in hosts:
+                hosts.append(parsed_host)
+    return hosts
+
 
 app = Flask(__name__)
 
-# Vercel terminates TLS in front of us; without this, canonical links, OG image
-# URLs and the sitemap would all be generated as http://.
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+# Only trust X-Forwarded-Proto / X-Forwarded-Host when explicitly running behind
+# Vercel or a configured reverse proxy.
+if env_flag_enabled("VERCEL") or env_flag_enabled("TRUST_PROXY"):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # The app is stateless: no accounts, no cookies, nothing to sign. That is why
 # there is no SECRET_KEY here — an absent secret used to be a hard failure, but
@@ -15,8 +62,22 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # and never fall back to a hardcoded default.
 
 
-def env_flag_enabled(name):
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+@app.before_request
+def enforce_trusted_host():
+    trusted = app.config.get("TRUSTED_HOSTS") or get_trusted_hosts()
+    if not host_is_trusted(request.host, trusted):
+        abort(400)
+
+
+@app.context_processor
+def inject_public_urls():
+    canonical = None
+    if request.endpoint and request.routing_exception is None:
+        canonical = public_url(url_for(request.endpoint, **(request.view_args or {})))
+    return {
+        "canonical_url": canonical,
+        "public_url": public_url,
+    }
 
 NAMES = [
     {"id": 1, "name": "והו", "transliteration": "Vav Hey Vav", "meaning": "Time Travel / Return to Creation", "theme": "Time Travel"},
@@ -207,12 +268,11 @@ def sitemap():
     paths = [url_for("index"), url_for("library")]
     paths += [url_for("session_view", name_id=n["id"]) for n in NAMES]
 
-    root = url_for("index", _external=True).rstrip("/")
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ]
-    body += [f"  <url><loc>{root}{path}</loc></url>" for path in paths]
+    body += [f"  <url><loc>{escape(public_url(path))}</loc></url>" for path in paths]
     body.append("</urlset>")
     return Response("\n".join(body) + "\n", mimetype="application/xml")
 
@@ -220,14 +280,14 @@ def sitemap():
 @app.route("/robots.txt")
 def robots():
     return Response(
-        f"User-agent: *\nAllow: /\n\nSitemap: {url_for('sitemap', _external=True)}\n",
+        f"User-agent: *\nAllow: /\n\nSitemap: {public_url(url_for('sitemap'))}\n",
         mimetype="text/plain",
     )
 
 
 @app.errorhandler(404)
 def not_found(_error):
-    return render_template("404.html"), 404
+    return render_template("404.html", canonical_url=None), 404
 
 
 if __name__ == "__main__":

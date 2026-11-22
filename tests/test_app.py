@@ -3,8 +3,9 @@ import os
 import shutil
 import subprocess
 import sys
+import pytest
 
-from app import GROUP_BY_NAME_ID, NAMES, SITUATION_GROUPS, app
+from app import GROUP_BY_NAME_ID, NAMES, SITUATION_GROUPS, app, get_public_base_url
 
 
 def test_home_page_links_into_the_catalog():
@@ -314,3 +315,281 @@ def test_finder_js_preserves_selected_group_on_pill_click_and_form_submit():
     )
     assert result.returncode == 0, result.stderr
     assert "finder-js-ok" in result.stdout
+
+
+def test_session_renders_breath_paced_player_controls_and_rtl_letters():
+    client = app.test_client()
+
+    html = client.get("/session/5").data.decode("utf-8")
+
+    assert 'dir="rtl"' in html
+    assert '<span class="hebrew-letter" data-letter-index="0">מ</span>' in html
+    assert '<span class="hebrew-letter" data-letter-index="1">ה</span>' in html
+    assert '<span class="hebrew-letter" data-letter-index="2">ש</span>' in html
+    for minutes, seconds in [("3 minutes", "180"), ("5 minutes", "300"), ("11 minutes", "660"), ("18 minutes", "1080")]:
+        assert f'<option value="{seconds}"' in html
+        assert minutes in html
+    for interval in ["4", "6", "8"]:
+        assert f'<option value="{interval}"' in html
+    assert 'id="drone-enabled"' in html
+    assert 'src="/static/player.js"' in html
+
+    js_resp = client.get("/static/player.js")
+    assert js_resp.status_code == 200
+    assert b"AudioContext" in js_resp.data
+
+
+def test_player_js_helpers_progress_letters_and_breath_phases():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const assert = require("assert");
+    const player = require("./static/player.js");
+    assert.strictEqual(player.formatRemainingSeconds(300), "05:00");
+    assert.strictEqual(player.formatRemainingSeconds(65), "01:05");
+    assert.strictEqual(player.computeActiveLetterIndex(1, 18, 3), 0);
+    assert.strictEqual(player.computeActiveLetterIndex(7, 18, 3), 1);
+    assert.strictEqual(player.computeActiveLetterIndex(15, 18, 3), 2);
+    assert.ok(player.computeBreathPhase(1, 6).includes("Inhale"));
+    assert.ok(player.computeBreathPhase(4, 6).includes("Exhale"));
+    console.log("player-js-ok");
+    """
+    result = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "player-js-ok" in result.stdout
+
+
+def test_player_js_releases_late_wakelock_and_cancels_breath_timeout_on_manual_play():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const assert = require("assert");
+
+    function makeElem(initialValue) {
+      const listeners = {};
+      return {
+        value: initialValue || "",
+        checked: false,
+        textContent: "",
+        paused: true,
+        currentTime: 0,
+        duration: 18,
+        attrs: {},
+        classList: { add() {}, remove() {} },
+        setAttribute(k, v) { this.attrs[k] = v; },
+        addEventListener(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+        emit(ev) { (listeners[ev] || []).forEach(fn => fn()); },
+        play() { this.paused = false; this.emit("play"); return Promise.resolve(); },
+        pause() { this.paused = true; }
+      };
+    }
+
+    const els = {
+      "chant-audio": makeElem(),
+      "session-toggle-btn": makeElem(),
+      "session-duration": makeElem("180"),
+      "breath-interval": makeElem("1"),
+      "drone-enabled": makeElem(),
+      "breath-cue": makeElem(),
+      "session-timer": makeElem()
+    };
+
+    let resolveWakeLock;
+    let sentinelReleased = 0;
+    const sentinel = { release() { sentinelReleased += 1; return Promise.resolve(); } };
+
+    global.window = { addEventListener() {} };
+    Object.defineProperty(globalThis, "navigator", {
+      value: {
+        wakeLock: {
+          request() {
+            return new Promise(res => { resolveWakeLock = res; });
+          }
+        }
+      },
+      configurable: true
+    });
+    global.document = {
+      readyState: "complete",
+      getElementById(id) { return els[id] || null; },
+      querySelectorAll() { return [makeElem(), makeElem(), makeElem()]; }
+    };
+
+    const player = require("./static/player.js");
+
+    // 1. Start session, then stop BEFORE wakeLock promise resolves -> sentinel must release immediately on resolve
+    els["session-toggle-btn"].emit("click");
+    els["session-toggle-btn"].emit("click");
+    resolveWakeLock(sentinel);
+
+    setImmediate(() => {
+      assert.strictEqual(sentinelReleased, 1, "Late wakeLock sentinel should be released");
+
+      // 2. Start session, finish first chant -> enter breath pause -> user manually plays audio
+      els["breath-interval"].value = "0.05";
+      els["session-toggle-btn"].emit("click");
+      resolveWakeLock(sentinel);
+      els["chant-audio"].paused = true;
+      els["chant-audio"].emit("ended");
+      assert.ok(els["breath-cue"].textContent.includes("Inhale"));
+
+      // Simulate native Play mid-breath-pause at currentTime = 5s
+      els["chant-audio"].currentTime = 5;
+      els["chant-audio"].paused = false;
+      els["chant-audio"].emit("play");
+      assert.ok(els["breath-cue"].textContent.includes("Chanting"));
+
+      setTimeout(() => {
+        // Stale breathTimeout must NOT have fired and reset currentTime to 0
+        assert.strictEqual(els["chant-audio"].currentTime, 5);
+        els["session-toggle-btn"].emit("click");
+        console.log("player-dom-edge-cases-ok");
+      }, 90);
+    });
+    """
+    result = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "player-dom-edge-cases-ok" in result.stdout
+
+
+def test_untrusted_host_header_returns_400():
+    client = app.test_client()
+
+    assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
+    assert client.get("/session/999", headers={"Host": "evil.example"}).status_code == 400
+
+
+def test_spoofed_forwarded_headers_and_query_do_not_affect_canonical_or_sitemap():
+    client = app.test_client()
+    spoofed = {
+        "X-Forwarded-Host": "evil.example",
+        "X-Forwarded-Proto": "javascript",
+    }
+
+    session_resp = client.get("/session/1?utm_source=tracker&foo=bar", headers=spoofed)
+    html = session_resp.data.decode("utf-8")
+    assert session_resp.status_code == 200
+    assert 'href="https://72-luminous-names.vercel.app/session/1"' in html
+    assert 'property="og:url" content="https://72-luminous-names.vercel.app/session/1"' in html
+    assert "evil.example" not in html
+    assert "javascript:" not in html
+    assert "utm_source" not in html
+
+    sitemap_resp = client.get("/sitemap.xml", headers=spoofed)
+    xml = sitemap_resp.data.decode("utf-8")
+    assert sitemap_resp.status_code == 200
+    assert "<loc>https://72-luminous-names.vercel.app/session/1</loc>" in xml
+    assert "evil.example" not in xml
+
+
+def test_public_base_url_env_controls_external_metadata(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://names.example.org")
+    client = app.test_client()
+
+    html = client.get("/session/12").data.decode("utf-8")
+    sitemap_xml = client.get("/sitemap.xml").data.decode("utf-8")
+    robots_txt = client.get("/robots.txt").data.decode("utf-8")
+
+    assert 'rel="canonical" href="https://names.example.org/session/12"' in html
+    assert 'property="og:image" content="https://names.example.org/static/banner.png"' in html
+    assert 'property="og:audio" content="https://names.example.org/static/audio/12.mp3"' in html
+    assert "<loc>https://names.example.org/library</loc>" in sitemap_xml
+    assert "Sitemap: https://names.example.org/sitemap.xml" in robots_txt
+
+
+def test_404_omits_canonical_and_missing_audio_omits_og_audio(monkeypatch, tmp_path):
+    client = app.test_client()
+
+    not_found_html = client.get("/session/999").data.decode("utf-8")
+    assert 'rel="canonical"' not in not_found_html
+    assert 'property="og:url"' not in not_found_html
+
+    monkeypatch.setattr(app, "static_folder", str(tmp_path))
+    missing_audio_html = client.get("/session/1").data.decode("utf-8")
+    assert 'property="og:audio"' not in missing_audio_html
+
+
+def test_invalid_public_base_url_is_rejected(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "javascript://alert(1)")
+
+    with pytest.raises(ValueError):
+        get_public_base_url()
+
+
+def test_production_host_works_with_no_new_environment_variables():
+    base_env = os.environ.copy()
+    for var in ("PUBLIC_BASE_URL", "TRUSTED_HOSTS", "TRUST_PROXY", "SECRET_KEY", "FLASK_DEBUG", "VERCEL"):
+        base_env.pop(var, None)
+
+    probe = """
+import app as app_mod
+
+client = app_mod.app.test_client()
+for path in ["/", "/library", "/session/1", "/sitemap.xml", "/robots.txt"]:
+    r = client.get(path, headers={"Host": "72-luminous-names.vercel.app"})
+    assert r.status_code == 200, (path, r.status_code)
+
+preview = client.get("/", headers={"Host": "72-luminous-names-git-main-fayerman.vercel.app"})
+assert preview.status_code == 200
+print("prod-host-direct-ok")
+"""
+    direct = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=Path(__file__).resolve().parents[1],
+        env=base_env,
+        capture_output=True,
+        text=True,
+    )
+    assert direct.returncode == 0, direct.stderr
+    assert "prod-host-direct-ok" in direct.stdout
+
+    vercel_env = base_env.copy()
+    vercel_env["VERCEL"] = "1"
+    vercel_probe = """
+import app as app_mod
+
+client = app_mod.app.test_client()
+for path in ["/", "/library", "/session/1", "/sitemap.xml", "/robots.txt"]:
+    r = client.get(
+        path,
+        headers={
+            "Host": "internal-lambda.local",
+            "X-Forwarded-Host": "72-luminous-names.vercel.app",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+    assert r.status_code == 200, (path, r.status_code)
+html = client.get(
+    "/session/1",
+    headers={
+        "Host": "internal-lambda.local",
+        "X-Forwarded-Host": "72-luminous-names.vercel.app",
+        "X-Forwarded-Proto": "https",
+    },
+).data.decode("utf-8")
+assert 'rel="canonical" href="https://72-luminous-names.vercel.app/session/1"' in html
+print("prod-host-vercel-ok")
+"""
+    on_vercel = subprocess.run(
+        [sys.executable, "-c", vercel_probe],
+        cwd=Path(__file__).resolve().parents[1],
+        env=vercel_env,
+        capture_output=True,
+        text=True,
+    )
+    assert on_vercel.returncode == 0, on_vercel.stderr
+    assert "prod-host-vercel-ok" in on_vercel.stdout
