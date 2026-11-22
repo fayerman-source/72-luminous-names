@@ -5,17 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}72 Names Meditations{% endblock %}</title>
     <meta name="description" content="{% block description %}Listen to a chant for each of the 72 Hebrew names, with the intention traditionally attached to it. Free, no signup.{% endblock %}">
-    <link rel="canonical" href="{{ request.url }}">
+    {% if canonical_url %}
+    <link rel="canonical" href="{{ canonical_url }}">
+    {% endif %}
     <meta property="og:site_name" content="72 Names Meditations">
     <meta property="og:type" content="{% block og_type %}website{% endblock %}">
     <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
     <meta property="og:description" content="{{ self.description() }}">
-    <meta property="og:url" content="{{ request.url }}">
-    <meta property="og:image" content="{{ url_for('static', filename='banner.png', _external=True) }}">
+    {% if canonical_url %}
+    <meta property="og:url" content="{{ canonical_url }}">
+    {% endif %}
+    <meta property="og:image" content="{{ public_url(url_for('static', filename='banner.png')) }}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ self.og_title() }}">
     <meta name="twitter:description" content="{{ self.description() }}">
-    <meta name="twitter:image" content="{{ url_for('static', filename='banner.png', _external=True) }}">
+    <meta name="twitter:image" content="{{ public_url(url_for('static', filename='banner.png')) }}">
     {% block head_extra %}{% endblock %}
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
