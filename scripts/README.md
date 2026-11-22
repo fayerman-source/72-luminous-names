@@ -15,6 +15,16 @@ loudness swings (`±4.5 dB` around the median and `<=6.0 dB` total spread). Exit
 code `1` when any track or catalog loudness check fails. See `scripts/AUDIO_QC_REPORT.md`
 for the current audit of shipped files.
 
+## Static Site Export
+
+```bash
+python scripts/build_static.py --output dist
+```
+
+Renders `/sitemap.xml`, `/robots.txt`, `/404.html`, and every route listed in
+`/sitemap.xml` (`/` -> `dist/index.html`, `/library` -> `dist/library/index.html`,
+`/session/1..72` -> `dist/session/<id>/index.html`) alongside `static/` assets.
+
 ## Voice-search probes
 
 The `probe_*.py` files are one-off experiments used to choose the voice for the
