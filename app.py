@@ -1,12 +1,59 @@
-from flask import Flask, Response, abort, render_template, url_for
+from flask import Flask, Response, abort, render_template, request, url_for
+from urllib.parse import urlsplit
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.sansio.utils import host_is_trusted
+from xml.sax.saxutils import escape
 import os
+
+DEFAULT_PUBLIC_BASE_URL = "https://72-luminous-names.vercel.app"
+
+
+def env_flag_enabled(name):
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_public_base_url():
+    raw = os.environ.get("PUBLIC_BASE_URL", "").strip() or DEFAULT_PUBLIC_BASE_URL
+    parsed = urlsplit(raw)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or any(ch in parsed.netloc for ch in '/?#@<>"\'& \t\r\n')
+    ):
+        raise ValueError(f"Invalid PUBLIC_BASE_URL: {raw!r}")
+    return f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
+
+
+def public_url(path):
+    normalized = path if path.startswith("/") else f"/{path}"
+    return f"{get_public_base_url()}{normalized}"
+
+
+def get_trusted_hosts():
+    configured = os.environ.get("TRUSTED_HOSTS", "").strip()
+    if configured:
+        return [h.strip() for h in configured.split(",") if h.strip()]
+    hosts = ["localhost", "127.0.0.1", ".vercel.app"]
+    public_host = urlsplit(get_public_base_url()).hostname
+    if public_host and public_host not in hosts:
+        hosts.append(public_host)
+    for vercel_var in ("VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        raw_host = os.environ.get(vercel_var, "").strip()
+        if raw_host:
+            parsed_host = urlsplit(raw_host if "://" in raw_host else f"https://{raw_host}").hostname
+            if parsed_host and parsed_host not in hosts:
+                hosts.append(parsed_host)
+    return hosts
+
 
 app = Flask(__name__)
 
-# Vercel terminates TLS in front of us; without this, canonical links, OG image
-# URLs and the sitemap would all be generated as http://.
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+# Only trust X-Forwarded-Proto / X-Forwarded-Host when explicitly running behind
+# Vercel or a configured reverse proxy.
+if env_flag_enabled("VERCEL") or env_flag_enabled("TRUST_PROXY"):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # The app is stateless: no accounts, no cookies, nothing to sign. That is why
 # there is no SECRET_KEY here — an absent secret used to be a hard failure, but
@@ -15,13 +62,27 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # and never fall back to a hardcoded default.
 
 
-def env_flag_enabled(name):
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+@app.before_request
+def enforce_trusted_host():
+    trusted = app.config.get("TRUSTED_HOSTS") or get_trusted_hosts()
+    if not host_is_trusted(request.host, trusted):
+        abort(400)
+
+
+@app.context_processor
+def inject_public_urls():
+    canonical = None
+    if request.endpoint and request.routing_exception is None:
+        canonical = public_url(url_for(request.endpoint, **(request.view_args or {})))
+    return {
+        "canonical_url": canonical,
+        "public_url": public_url,
+    }
 
 NAMES = [
     {"id": 1, "name": "והו", "transliteration": "Vav Hey Vav", "meaning": "Time Travel / Return to Creation", "theme": "Time Travel"},
     {"id": 2, "name": "ילי", "transliteration": "Yud Lamed Yud", "meaning": "Recapturing the Sparks", "theme": "Recapturing Sparks"},
-    {"id": 3, "name": "סית", "transliteration": "Samech Yud Tav", "meaning": "Miracle Making", "theme": "Miracle Making"},
+    {"id": 3, "name": "סיט", "transliteration": "Samech Yud Tet", "meaning": "Miracle Making", "theme": "Miracle Making"},
     {"id": 4, "name": "עלם", "transliteration": "Ayin Lamed Mem", "meaning": "Eliminating Negative Thoughts", "theme": "Negative Thoughts"},
     {"id": 5, "name": "מהש", "transliteration": "Mem Hey Shin", "meaning": "Healing", "theme": "Healing"},
     {"id": 6, "name": "ללה", "transliteration": "Lamed Lamed Hey", "meaning": "Dream State", "theme": "Dream State"},
@@ -94,14 +155,95 @@ NAMES = [
 ]
 
 
+SITUATION_GROUPS = [
+    {
+        "slug": "healing",
+        "label": "Healing & Renewal",
+        "ids": {2, 5, 7, 16, 18, 20, 21, 35, 54, 59, 61, 72},
+    },
+    {
+        "slug": "peace",
+        "label": "Peace & Letting Go",
+        "ids": {4, 8, 14, 24, 29, 32, 34, 44, 50, 51, 53, 56, 58, 60},
+    },
+    {
+        "slug": "clarity",
+        "label": "Clarity & Vision",
+        "ids": {1, 6, 15, 19, 26, 33, 37, 42, 46, 57, 65, 69, 70, 71},
+    },
+    {
+        "slug": "love",
+        "label": "Love & Connection",
+        "ids": {12, 13, 22, 23, 25, 28, 30, 40, 48, 62, 64, 68},
+    },
+    {
+        "slug": "protection",
+        "label": "Protection & Courage",
+        "ids": {9, 10, 11, 17, 36, 41, 43, 66},
+    },
+    {
+        "slug": "purpose",
+        "label": "Purpose, Action & Joy",
+        "ids": {3, 27, 31, 38, 39, 45, 47, 49, 52, 55, 63, 67},
+    },
+]
+
+GROUP_BY_NAME_ID = {
+    name_id: grp
+    for grp in SITUATION_GROUPS
+    for name_id in grp["ids"]
+}
+
+
+def filter_names(query="", group_slug=""):
+    normalized_q = (query or "").strip().lower()
+    normalized_group = (group_slug or "").strip().lower()
+    valid_slugs = {g["slug"] for g in SITUATION_GROUPS}
+    active_group = normalized_group if normalized_group in valid_slugs else ""
+
+    matched = []
+    for item in NAMES:
+        grp = GROUP_BY_NAME_ID.get(item["id"])
+        if active_group and (not grp or grp["slug"] != active_group):
+            continue
+        if normalized_q:
+            haystack = " ".join([
+                str(item["id"]),
+                item["name"],
+                item["transliteration"],
+                item["meaning"],
+                item["theme"],
+                grp["label"] if grp else "",
+            ]).lower()
+            if normalized_q not in haystack:
+                continue
+        matched.append(item)
+    return matched, active_group
+
+
 @app.route("/")
 def index():
-    return render_template("index.html", names=NAMES[:6])
+    return render_template(
+        "index.html",
+        names=NAMES[:6],
+        situation_groups=SITUATION_GROUPS,
+    )
 
 
 @app.route("/library")
 def library():
-    return render_template("library.html", names=NAMES)
+    query = request.args.get("q", "").strip()
+    group_slug = request.args.get("group", "").strip()
+    filtered_names, active_group = filter_names(query=query, group_slug=group_slug)
+    return render_template(
+        "library.html",
+        names=filtered_names,
+        total_count=len(NAMES),
+        query=query,
+        active_group=active_group,
+        situation_groups=SITUATION_GROUPS,
+        group_by_id=GROUP_BY_NAME_ID,
+    )
 
 
 @app.route("/session/<int:name_id>")
@@ -126,12 +268,11 @@ def sitemap():
     paths = [url_for("index"), url_for("library")]
     paths += [url_for("session_view", name_id=n["id"]) for n in NAMES]
 
-    root = url_for("index", _external=True).rstrip("/")
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ]
-    body += [f"  <url><loc>{root}{path}</loc></url>" for path in paths]
+    body += [f"  <url><loc>{escape(public_url(path))}</loc></url>" for path in paths]
     body.append("</urlset>")
     return Response("\n".join(body) + "\n", mimetype="application/xml")
 
@@ -139,14 +280,14 @@ def sitemap():
 @app.route("/robots.txt")
 def robots():
     return Response(
-        f"User-agent: *\nAllow: /\n\nSitemap: {url_for('sitemap', _external=True)}\n",
+        f"User-agent: *\nAllow: /\n\nSitemap: {public_url(url_for('sitemap'))}\n",
         mimetype="text/plain",
     )
 
 
 @app.errorhandler(404)
 def not_found(_error):
-    return render_template("404.html"), 404
+    return render_template("404.html", canonical_url=None), 404
 
 
 if __name__ == "__main__":
