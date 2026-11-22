@@ -1,9 +1,17 @@
-(function () {
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) {
+    module.exports = factory();
+  } else {
+    root.LuminousFinder = factory();
+  }
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
-  if (typeof document === "undefined") return;
 
   function initFinder() {
+    if (typeof document === "undefined") return;
+    var form = document.getElementById("intention-finder-form");
     var input = document.getElementById("intention-search");
+    var groupInput = document.getElementById("finder-group-input");
     var cards = Array.prototype.slice.call(document.querySelectorAll(".name-card"));
     var pills = Array.prototype.slice.call(document.querySelectorAll(".group-pill"));
     var statusEl = document.getElementById("finder-status");
@@ -20,7 +28,22 @@
       }
     });
 
+    function syncGroupInput() {
+      if (!groupInput && form && document.createElement) {
+        groupInput = document.createElement("input");
+        groupInput.type = "hidden";
+        groupInput.id = "finder-group-input";
+        groupInput.name = "group";
+        form.insertBefore(groupInput, form.firstChild || null);
+      }
+      if (groupInput) {
+        groupInput.value = activeGroup;
+        groupInput.disabled = !activeGroup;
+      }
+    }
+
     function applyFilter() {
+      syncGroupInput();
       var q = (input.value || "").trim().toLowerCase();
       var visible = 0;
 
@@ -42,7 +65,7 @@
         clientEmptyEl.hidden = visible > 0;
       }
 
-      if (window.history && window.history.replaceState) {
+      if (typeof window !== "undefined" && window.history && window.history.replaceState) {
         var params = new URLSearchParams();
         if (activeGroup) params.set("group", activeGroup);
         if (q) params.set("q", input.value.trim());
@@ -51,7 +74,15 @@
       }
     }
 
+    syncGroupInput();
     input.addEventListener("input", applyFilter);
+
+    if (form) {
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        applyFilter();
+      });
+    }
 
     pills.forEach(function (pill) {
       pill.addEventListener("click", function (ev) {
@@ -65,9 +96,13 @@
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initFinder);
-  } else {
-    initFinder();
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initFinder);
+    } else {
+      initFinder();
+    }
   }
-})();
+
+  return { initFinder: initFinder };
+});

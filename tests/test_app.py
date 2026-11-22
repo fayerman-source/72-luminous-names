@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 
@@ -180,3 +181,101 @@ def test_home_page_exposes_intention_search_and_situation_links():
     assert 'action="/library"' in html
     assert 'href="/library?group=healing"' in html
     assert 'href="/library?group=peace"' in html
+
+
+def test_finder_js_preserves_selected_group_on_pill_click_and_form_submit():
+    node_bin = shutil.which("node")
+    if node_bin is None:
+        return
+
+    script = """
+    const assert = require("assert");
+
+    function makeNode(attrs = {}, initialActive = false) {
+      const listeners = {};
+      let active = initialActive;
+      return {
+        value: attrs.value || "",
+        disabled: Boolean(attrs.disabled),
+        hidden: false,
+        textContent: "",
+        firstChild: null,
+        classList: {
+          contains(cls) { return cls === "is-active" && active; },
+          toggle(cls, force) { if (cls === "is-active") active = Boolean(force); }
+        },
+        getAttribute(k) { return attrs[k] || ""; },
+        addEventListener(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+        emit(ev, payload) { (listeners[ev] || []).forEach(fn => fn(payload || { preventDefault() {} })); },
+        insertBefore() {}
+      };
+    }
+
+    const form = makeNode();
+    const searchInput = makeNode();
+    const groupInput = makeNode({ value: "", disabled: true });
+    const statusEl = makeNode();
+    const emptyEl = makeNode();
+    const allPill = makeNode({ "data-group": "" }, true);
+    const peacePill = makeNode({ "data-group": "peace" }, false);
+
+    const cards = Array.from({ length: 72 }, (_, idx) =>
+      makeNode({
+        "data-group": idx < 14 ? "peace" : "healing",
+        "data-search": idx === 0 ? "56 Dispelling Anger Peace" : "5 Healing"
+      })
+    );
+
+    let lastUrl = "";
+    global.window = {
+      location: { pathname: "/library" },
+      history: { replaceState(_s, _t, url) { lastUrl = url; } }
+    };
+    global.document = {
+      readyState: "complete",
+      getElementById(id) {
+        const map = {
+          "intention-finder-form": form,
+          "intention-search": searchInput,
+          "finder-group-input": groupInput,
+          "finder-status": statusEl,
+          "finder-client-empty": emptyEl
+        };
+        return map[id] || null;
+      },
+      querySelectorAll(sel) {
+        if (sel === ".name-card") return cards;
+        if (sel === ".group-pill") return [allPill, peacePill];
+        return [];
+      }
+    };
+
+    require("./static/finder.js");
+
+    // Select Peace pill, enter query, and submit form -> group stays active & synchronized
+    peacePill.emit("click", { preventDefault() {} });
+    assert.strictEqual(groupInput.value, "peace");
+    assert.strictEqual(groupInput.disabled, false);
+
+    searchInput.value = "anger";
+    let defaultPrevented = false;
+    form.emit("submit", { preventDefault() { defaultPrevented = true; } });
+    assert.strictEqual(defaultPrevented, true);
+    assert.strictEqual(groupInput.value, "peace");
+    assert.strictEqual(lastUrl, "/library?group=peace&q=anger");
+    assert.strictEqual(cards.filter(c => !c.hidden).length, 1);
+
+    // Selecting All 72 disables hidden group input cleanly
+    allPill.emit("click", { preventDefault() {} });
+    assert.strictEqual(groupInput.value, "");
+    assert.strictEqual(groupInput.disabled, true);
+    console.log("finder-js-ok");
+    """
+    result = subprocess.run(
+        [node_bin, "-e", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "finder-js-ok" in result.stdout

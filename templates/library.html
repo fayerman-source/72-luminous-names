@@ -24,9 +24,7 @@
 
 <div class="finder-bar">
     <form id="intention-finder-form" class="finder-form" action="/library" method="get">
-        {% if active_group %}
-        <input type="hidden" id="finder-group-input" name="group" value="{{ active_group }}">
-        {% endif %}
+        <input type="hidden" id="finder-group-input" name="group" value="{{ active_group }}" {% if not active_group %}disabled{% endif %}>
         <input id="intention-search" class="finder-input" type="search" name="q" value="{{ query }}" aria-label="Search names by intention, letters, or number" placeholder="Search intention, Hebrew letters, transliteration, or # (e.g. healing, anger, love, 5)...">
         <button type="submit" class="btn" style="padding: 10px 22px;">Search</button>
         {% if query or active_group %}
