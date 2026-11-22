@@ -7,8 +7,10 @@
 {% block og_type %}music.song{% endblock %}
 
 {% block head_extra %}
-<meta property="og:audio" content="{{ url_for('static', filename='audio/' ~ name.id ~ '.mp3', _external=True) }}">
+{% if audio_available %}
+<meta property="og:audio" content="{{ public_url(url_for('static', filename='audio/' ~ name.id ~ '.mp3')) }}">
 <meta property="og:audio:type" content="audio/mpeg">
+{% endif %}
 {% endblock %}
 
 {% block styles %}
